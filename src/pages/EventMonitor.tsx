@@ -56,7 +56,7 @@ export function EventMonitor() {
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<NostrEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
   const relayRef = useRef<NRelay1 | null>(null);
-  const previousFiltersRef = useRef<EventFilters>(filters);
+  const previousFiltersRef = useRef<NostrFilter>({});
   const previousRelayRef = useRef<string>(filters.relay);
 
   // Memoize query filters to prevent unnecessary recalculations
@@ -202,7 +202,7 @@ export function EventMonitor() {
     if (currentFiltersString !== previousFiltersString || relayChanged) {
       setStreamEvents([]);
       setLastDisplayedEvents([]);
-      previousFiltersRef.current = queryFilters;
+      previousFiltersRef.current = { ...queryFilters };
       previousRelayRef.current = filters.relay;
     }
     

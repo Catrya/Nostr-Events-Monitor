@@ -16,7 +16,14 @@ interface AppProviderProps {
 // Zod schema for AppConfig validation
 const AppConfigSchema: z.ZodType<AppConfig, z.ZodTypeDef, unknown> = z.object({
   theme: z.enum(['dark', 'light', 'system']),
-  relayUrl: z.string().url(),
+  relayUrl: z.string().refine((url) => {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'wss:';
+    } catch {
+      return false;
+    }
+  }, { message: 'Must be a secure WebSocket URL (wss://)' }),
 });
 
 export function AppProvider(props: AppProviderProps) {

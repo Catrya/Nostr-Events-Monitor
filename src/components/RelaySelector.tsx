@@ -35,7 +35,7 @@ export function RelaySelector(props: RelaySelectorProps) {
 
   const selectedOption = presetRelays.find((option) => option.url === selectedRelay);
 
-  // Function to normalize relay URL by adding wss:// if no protocol is present
+  // Function to normalize relay URL by adding wss:// protocol if none is present
   const normalizeRelayUrl = (url: string): string => {
     const trimmed = url.trim();
     if (!trimmed) return trimmed;
@@ -45,7 +45,7 @@ export function RelaySelector(props: RelaySelectorProps) {
       return trimmed;
     }
     
-    // Add wss:// prefix
+    // Always use wss:// for secure connections
     return `wss://${trimmed}`;
   };
 
@@ -64,8 +64,10 @@ export function RelaySelector(props: RelaySelectorProps) {
     // Basic validation - should contain at least a domain-like structure
     const normalized = normalizeRelayUrl(trimmed);
     try {
-      new URL(normalized);
-      return true;
+      const url = new URL(normalized);
+      // Only accept wss:// protocol for secure connections
+      // Also check that it has a valid hostname
+      return url.protocol === 'wss:' && url.hostname.length > 0;
     } catch {
       return false;
     }

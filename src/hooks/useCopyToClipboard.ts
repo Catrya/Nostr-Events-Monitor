@@ -17,20 +17,29 @@ export function useCopyToClipboard(): UseCopyToClipboardReturn {
     setCopySuccess(false);
 
     try {
-      if (navigator.clipboard && window.isSecureContext) {
-        await navigator.clipboard.writeText(text);
+      // Check if we're in a browser environment
+      if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // Fallback for older browsers or non-secure contexts
+          const textArea = document.createElement('textarea');
+          textArea.value = text;
+          textArea.style.position = 'fixed';
+          textArea.style.left = '-999999px';
+          textArea.style.top = '-999999px';
+          document.body.appendChild(textArea);
+          textArea.focus();
+          textArea.select();
+          const successful = document.execCommand('copy');
+          textArea.remove();
+          
+          if (!successful) {
+            throw new Error('Copy command was unsuccessful');
+          }
+        }
       } else {
-        // Fallback for older browsers or non-secure contexts
-        const textArea = document.createElement('textarea');
-        textArea.value = text;
-        textArea.style.position = 'fixed';
-        textArea.style.left = '-999999px';
-        textArea.style.top = '-999999px';
-        document.body.appendChild(textArea);
-        textArea.focus();
-        textArea.select();
-        document.execCommand('copy');
-        textArea.remove();
+        throw new Error('Clipboard API not available');
       }
 
       setCopySuccess(true);

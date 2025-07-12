@@ -17,30 +17,8 @@ export function useCopyToClipboard(): UseCopyToClipboardReturn {
     setCopySuccess(false);
 
     try {
-      // Check if we're in a browser environment
-      if (typeof window !== 'undefined' && typeof navigator !== 'undefined') {
-        if (navigator.clipboard && window.isSecureContext) {
-          await navigator.clipboard.writeText(text);
-        } else {
-          // Fallback for older browsers or non-secure contexts
-          const textArea = document.createElement('textarea');
-          textArea.value = text;
-          textArea.style.position = 'fixed';
-          textArea.style.left = '-999999px';
-          textArea.style.top = '-999999px';
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          const successful = document.execCommand('copy');
-          textArea.remove();
-          
-          if (!successful) {
-            throw new Error('Copy command was unsuccessful');
-          }
-        }
-      } else {
-        throw new Error('Clipboard API not available');
-      }
+      // Simple implementation - let the browser handle it
+      await navigator.clipboard.writeText(text);
 
       setCopySuccess(true);
       toast({
@@ -52,7 +30,7 @@ export function useCopyToClipboard(): UseCopyToClipboardReturn {
       console.error('Failed to copy text: ', error);
       toast({
         title: 'Copy failed',
-        description: 'Unable to copy to clipboard',
+        description: 'Unable to copy to clipboard. Please copy manually.',
         variant: 'destructive',
         duration: 3000,
       });

@@ -9,8 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
-import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { Copy, Check } from 'lucide-react';
+import { useToast } from '@/hooks/useToast';
 
 interface EventFilters {
   relay: string;
@@ -53,14 +53,43 @@ export function EventMonitor() {
     until: '',
     tags: ''
   });
-  const { copyToClipboard, isCopying, copySuccess } = useCopyToClipboard();
   const [isStreaming, setIsStreaming] = useState(false);
+  const [copyingEventId, setCopyingEventId] = useState<string | null>(null);
+  const [copiedEventId, setCopiedEventId] = useState<string | null>(null);
+  const { toast } = useToast();
   
   // Function to handle copying event data
-  const handleCopyEvent = useCallback((event: NostrEvent) => {
-    const eventData = JSON.stringify(event, null, 2);
-    copyToClipboard(eventData);
-  }, [copyToClipboard]);
+  const handleCopyEvent = useCallback(async (event: NostrEvent) => {
+    setCopyingEventId(event.id);
+    setCopiedEventId(null);
+
+    try {
+      const eventData = JSON.stringify(event, null, 2);
+      await navigator.clipboard.writeText(eventData);
+      
+      setCopiedEventId(event.id);
+      toast({
+        title: 'Copied!',
+        description: 'Event copied to clipboard',
+        duration: 2000,
+      });
+      
+      // Reset copied state after 2 seconds
+      setTimeout(() => {
+        setCopiedEventId(null);
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to copy text: ', error);
+      toast({
+        title: 'Copy failed',
+        description: 'Unable to copy to clipboard',
+        variant: 'destructive',
+        duration: 3000,
+      });
+    } finally {
+      setCopyingEventId(null);
+    }
+  }, [toast]);
   const [streamEvents, setStreamEvents] = useState<NostrEvent[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<NostrEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -614,11 +643,11 @@ export function EventMonitor() {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleCopyEvent(event)}
-                  disabled={isCopying}
+                  disabled={copyingEventId === event.id}
                   className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-accent/20"
                   title="Copy event to clipboard"
                 >
-                  {copySuccess ? (
+                  {copiedEventId === event.id ? (
                     <Check className="h-3 w-3 text-green-500" />
                   ) : (
                     <Copy className="h-3 w-3" />

@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { Copy, Check } from 'lucide-react';
 
 interface EventFilters {
   relay: string;
@@ -51,7 +53,14 @@ export function EventMonitor() {
     until: '',
     tags: ''
   });
+  const { copyToClipboard, isCopying, copySuccess } = useCopyToClipboard();
   const [isStreaming, setIsStreaming] = useState(false);
+  
+  // Function to handle copying event data
+  const handleCopyEvent = useCallback((event: NostrEvent) => {
+    const eventData = JSON.stringify(event, null, 2);
+    copyToClipboard(eventData);
+  }, [copyToClipboard]);
   const [streamEvents, setStreamEvents] = useState<NostrEvent[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<NostrEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -591,8 +600,32 @@ export function EventMonitor() {
           )}
 
           {displayEvents.map((event, index) => (
-            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200">
-              <CardContent className="p-4">
+            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative group">
+              <CardHeader className="flex flex-row items-center justify-between py-2 px-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">
+                    Kind {event.kind}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(event.created_at * 1000).toLocaleString()}
+                  </span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleCopyEvent(event)}
+                  disabled={isCopying}
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hover:bg-accent/20"
+                  title="Copy event to clipboard"
+                >
+                  {copySuccess ? (
+                    <Check className="h-3 w-3 text-green-500" />
+                  ) : (
+                    <Copy className="h-3 w-3" />
+                  )}
+                </Button>
+              </CardHeader>
+              <CardContent className="px-4 pb-4 pt-0">
                 <JsonViewer data={event} />
               </CardContent>
             </Card>

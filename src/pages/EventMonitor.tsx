@@ -59,26 +59,43 @@ export function EventMonitor() {
   const { toast } = useToast();
   
   // Function to handle copying event data
-  const handleCopyEvent = useCallback(async (event: NostrEvent) => {
+  const handleCopyEvent = useCallback((event: NostrEvent) => {
     setCopyingEventId(event.id);
     setCopiedEventId(null);
 
+    const eventData = JSON.stringify(event, null, 2);
+    
+    // Create a text area and use the old method
+    const textArea = document.createElement('textarea');
+    textArea.value = eventData;
+    textArea.style.position = 'fixed';
+    textArea.style.left = '-999999px';
+    textArea.style.top = '-999999px';
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    
     try {
-      const eventData = JSON.stringify(event, null, 2);
-      await navigator.clipboard.writeText(eventData);
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
       
-      setCopiedEventId(event.id);
-      toast({
-        title: 'Copied!',
-        description: 'Event copied to clipboard',
-        duration: 2000,
-      });
-      
-      // Reset copied state after 2 seconds
-      setTimeout(() => {
-        setCopiedEventId(null);
-      }, 2000);
+      if (successful) {
+        setCopiedEventId(event.id);
+        toast({
+          title: 'Copied!',
+          description: 'Event copied to clipboard',
+          duration: 2000,
+        });
+        
+        // Reset copied state after 2 seconds
+        setTimeout(() => {
+          setCopiedEventId(null);
+        }, 2000);
+      } else {
+        throw new Error('Copy command failed');
+      }
     } catch (error) {
+      document.body.removeChild(textArea);
       console.error('Failed to copy text: ', error);
       toast({
         title: 'Copy failed',

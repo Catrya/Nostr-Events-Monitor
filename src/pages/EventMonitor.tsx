@@ -619,6 +619,15 @@ export function EventMonitor() {
             >
               MKStack
             </a>
+            {" "}•{" "}
+            <a 
+              href="https://github.com/Catrya/Nostr-Events-Monitor" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              Source Code
+            </a>
           </p>
         </div>
       </div>

@@ -5,6 +5,7 @@ import { defineConfig } from "vitest/config";
 
 // https://vitejs.dev/config/
 export default defineConfig(() => ({
+  base: process.env.NODE_ENV === 'production' ? '/EventsMonitor/' : '/',
   server: {
     host: "::",
     port: 8080,

@@ -5,7 +5,7 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 export function AppRouter() {
-  const basename = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL;
+  const basename = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.slice(0, -1);
   
   return (
     <BrowserRouter basename={basename}>

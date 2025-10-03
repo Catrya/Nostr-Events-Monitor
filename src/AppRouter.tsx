@@ -5,8 +5,10 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
 export function AppRouter() {
+  const basename = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL;
+  
   return (
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <ScrollToTop />
       <Routes>
         <Route path="/" element={<Index />} />

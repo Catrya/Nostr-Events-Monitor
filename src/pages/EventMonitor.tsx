@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
+import { Copy, Check } from 'lucide-react';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 interface EventFilters {
   relay: string;
@@ -58,6 +60,7 @@ export function EventMonitor() {
   const relayRef = useRef<NRelay1 | null>(null);
   const previousFiltersRef = useRef<NostrFilter>({});
   const previousRelayRef = useRef<string>(filters.relay);
+  const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   // Memoize query filters to prevent unnecessary recalculations
   const queryFilters = useMemo(() => {
@@ -591,7 +594,20 @@ export function EventMonitor() {
           )}
 
           {displayEvents.map((event, index) => (
-            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200">
+            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
+                className="absolute top-1 right-1 h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 z-10 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm"
+                aria-label="Copy event to clipboard"
+              >
+                {isCopied ? (
+                  <Check className="h-4 w-4 text-green-500" />
+                ) : (
+                  <Copy className="h-4 w-4" />
+                )}
+              </Button>
               <CardContent className="p-4">
                 <JsonViewer data={event} />
               </CardContent>

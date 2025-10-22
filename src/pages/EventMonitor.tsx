@@ -43,6 +43,18 @@ function decodeAuthor(author: string): string {
   return author;
 }
 
+// Helper function to validate WebSocket URL
+function isValidWebSocketUrl(url: string): boolean {
+  if (!url || url.trim() === '') return false;
+  
+  try {
+    const urlObj = new URL(url);
+    return (urlObj.protocol === 'wss:' || urlObj.protocol === 'ws:') && urlObj.hostname !== '';
+  } catch {
+    return false;
+  }
+}
+
 export function EventMonitor() {
   const [filters, setFilters] = useState<EventFilters>({
     relay: '',
@@ -108,7 +120,7 @@ export function EventMonitor() {
   const { data: events, isLoading, refetch } = useQuery({
     queryKey: ['events', filters.relay, filters.kind, filters.limit, filters.author, filters.since, filters.until, filters.tags],
     queryFn: async (c) => {
-      if (!filters.relay) return [];
+      if (!isValidWebSocketUrl(filters.relay)) return [];
       
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(10000)]);
       
@@ -188,14 +200,14 @@ export function EventMonitor() {
         relay.close();
       }
     },
-    enabled: !!filters.relay && !!filters.limit,
+    enabled: isValidWebSocketUrl(filters.relay) && !!filters.limit,
     staleTime: 30000, // 30 seconds
     gcTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Handle streaming with optimized dependencies
   useEffect(() => {
-    if (!isStreaming || !filters.relay) return;
+    if (!isStreaming || !isValidWebSocketUrl(filters.relay)) return;
 
     // Only clear events when filters or relay have actually changed
     const currentFiltersString = JSON.stringify(queryFilters);

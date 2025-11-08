@@ -43,12 +43,27 @@ function decodeAuthor(author: string): string {
   return author;
 }
 
+// Helper function to normalize relay URL by adding wss:// protocol if none is present
+function normalizeRelayUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return trimmed;
+  
+  // Check if it already has a protocol
+  if (trimmed.includes('://')) {
+    return trimmed;
+  }
+  
+  // Always use wss:// for secure connections
+  return `wss://${trimmed}`;
+}
+
 // Helper function to validate WebSocket URL
 function isValidWebSocketUrl(url: string): boolean {
   if (!url || url.trim() === '') return false;
   
   try {
-    const urlObj = new URL(url);
+    const normalizedUrl = normalizeRelayUrl(url);
+    const urlObj = new URL(normalizedUrl);
     return (urlObj.protocol === 'wss:' || urlObj.protocol === 'ws:') && urlObj.hostname !== '';
   } catch {
     return false;
@@ -124,8 +139,9 @@ export function EventMonitor() {
       
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(10000)]);
       
-      // Create a relay connection
-      const relay = new NRelay1(filters.relay);
+      // Create a relay connection with normalized URL
+      const normalizedRelayUrl = normalizeRelayUrl(filters.relay);
+      const relay = new NRelay1(normalizedRelayUrl);
       
       // Build query filters specifically for this query
       const qf: NostrFilter = {};
@@ -195,7 +211,7 @@ export function EventMonitor() {
           errorMessage = JSON.stringify(error);
         }
         
-        throw new Error(`Failed to connect to relay: ${errorMessage}. Check if relay is running on ${filters.relay}`);
+        throw new Error(`Failed to connect to relay: ${errorMessage}. Check if relay is running on ${normalizedRelayUrl}`);
       } finally {
         relay.close();
       }
@@ -221,8 +237,9 @@ export function EventMonitor() {
       previousRelayRef.current = filters.relay;
     }
     
-    // Create a relay connection for streaming
-    const relay = new NRelay1(filters.relay);
+    // Create a relay connection for streaming with normalized URL
+    const normalizedRelayUrl = normalizeRelayUrl(filters.relay);
+    const relay = new NRelay1(normalizedRelayUrl);
     relayRef.current = relay;
 
     // Start streaming
@@ -321,7 +338,7 @@ export function EventMonitor() {
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <ClickTooltip 
-                    content="Secure WebSocket URL of a Nostr relay (wss://)."
+                    content="Nostr relay URL. You can enter 'relay.damus.io' or 'wss://relay.damus.io' - both formats are accepted."
                     showOnLabelClick={true}
                   >
                     <Label htmlFor="relay" className="text-xs font-medium">
@@ -331,7 +348,7 @@ export function EventMonitor() {
                   <Input
                     id="relay"
                     type="text"
-                    placeholder="wss://relay.damus.io"
+                    placeholder="relay.damus.io or wss://relay.damus.io"
                     value={filters.relay}
                     onChange={(e) => setFilters(prev => ({ ...prev, relay: e.target.value }))}
                     required

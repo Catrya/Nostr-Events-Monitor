@@ -6,20 +6,25 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Plus, X } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 
 interface EventFilters {
-  relay: string;
-  kind: string;
+  relays: string[];
+  kinds: string[];
   limit: string;
-  author: string;
+  authors: string[];
   since: string;
   until: string;
   tags: string;
+}
+
+interface EventWithRelay extends NostrEvent {
+  relayUrl?: string;
 }
 
 // Helper function to decode npub to hex pubkey
@@ -72,43 +77,49 @@ function isValidWebSocketUrl(url: string): boolean {
 
 export function EventMonitor() {
   const [filters, setFilters] = useState<EventFilters>({
-    relay: '',
-    kind: '',
+    relays: [''],
+    kinds: [''],
     limit: '',
-    author: '',
+    authors: [''],
     since: '',
     until: '',
     tags: ''
   });
   const [isStreaming, setIsStreaming] = useState(false);
-  const [streamEvents, setStreamEvents] = useState<NostrEvent[]>([]);
-  const [lastDisplayedEvents, setLastDisplayedEvents] = useState<NostrEvent[]>([]);
+  const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
+  const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const relayRef = useRef<NRelay1 | null>(null);
+  const relayRef = useRef<NRelay1[]>([]);
   const previousFiltersRef = useRef<NostrFilter>({});
-  const previousRelayRef = useRef<string>(filters.relay);
+  const previousRelaysRef = useRef<string[]>(filters.relays);
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   // Memoize query filters to prevent unnecessary recalculations
   const queryFilters = useMemo(() => {
     const qf: NostrFilter = {};
-    
-    if (filters.kind) {
-      qf.kinds = [parseInt(filters.kind)];
+
+    // Filter out empty strings and parse kinds
+    const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
+    if (validKinds.length > 0) {
+      qf.kinds = validKinds;
     }
-    
-    if (filters.author) {
-      qf.authors = [decodeAuthor(filters.author)];
+
+    // Filter out empty strings and decode authors
+    const validAuthors = filters.authors
+      .filter(a => a.trim() !== '')
+      .map(a => decodeAuthor(a));
+    if (validAuthors.length > 0) {
+      qf.authors = validAuthors;
     }
-    
+
     if (filters.since) {
       qf.since = parseInt(filters.since);
     }
-    
+
     if (filters.until) {
       qf.until = parseInt(filters.until);
     }
-    
+
     if (filters.tags) {
       // Parse tags in format "tagname:value,tagname2:value2"
       const tagPairs = filters.tags.split(',').map(pair => pair.trim()).filter(Boolean);
@@ -120,50 +131,56 @@ export function EventMonitor() {
         }
       }
     }
-    
+
     // Apply limit - for streaming use specified limit or default
     if (filters.limit) {
       qf.limit = parseInt(filters.limit);
     } else {
       qf.limit = 50; // Default for streaming
     }
-    
-    return qf;
-  }, [filters.kind, filters.author, filters.since, filters.until, filters.tags, filters.limit]);
 
-  // Query for limited events
+    return qf;
+  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags, filters.limit]);
+
+  // Get valid relays
+  const validRelays = useMemo(() => {
+    return filters.relays
+      .filter(r => r.trim() !== '' && isValidWebSocketUrl(r))
+      .map(r => normalizeRelayUrl(r));
+  }, [filters.relays]);
+
+  // Query for limited events from multiple relays
   const { data: events, isLoading, refetch } = useQuery({
-    queryKey: ['events', filters.relay, filters.kind, filters.limit, filters.author, filters.since, filters.until, filters.tags],
+    queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags],
     queryFn: async (c) => {
-      if (!isValidWebSocketUrl(filters.relay)) return [];
-      
+      if (validRelays.length === 0) return [];
+
       const signal = AbortSignal.any([c.signal, AbortSignal.timeout(10000)]);
-      
-      // Create a relay connection with normalized URL
-      const normalizedRelayUrl = normalizeRelayUrl(filters.relay);
-      const relay = new NRelay1(normalizedRelayUrl);
-      
-      // Build query filters specifically for this query
+
+      // Build query filters
       const qf: NostrFilter = {};
-      
-      if (filters.kind) {
-        qf.kinds = [parseInt(filters.kind)];
+
+      const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
+      if (validKinds.length > 0) {
+        qf.kinds = validKinds;
       }
-      
-      if (filters.author) {
-        qf.authors = [decodeAuthor(filters.author)];
+
+      const validAuthors = filters.authors
+        .filter(a => a.trim() !== '')
+        .map(a => decodeAuthor(a));
+      if (validAuthors.length > 0) {
+        qf.authors = validAuthors;
       }
-      
+
       if (filters.since) {
         qf.since = parseInt(filters.since);
       }
-      
+
       if (filters.until) {
         qf.until = parseInt(filters.until);
       }
-      
+
       if (filters.tags) {
-        // Parse tags in format "tagname:value,tagname2:value2"
         const tagPairs = filters.tags.split(',').map(pair => pair.trim()).filter(Boolean);
         for (const pair of tagPairs) {
           const [tagName, tagValue] = pair.split(':').map(s => s.trim());
@@ -173,87 +190,113 @@ export function EventMonitor() {
           }
         }
       }
-      
-      // IMPORTANT: Apply the limit for queries (not streaming)
+
+      // Apply limit per relay
       if (filters.limit) {
         qf.limit = parseInt(filters.limit);
       } else {
-        // Set a reasonable default limit for discovery
         qf.limit = 50;
       }
-      
+
+      // Query all relays in parallel
+      const relayPromises = validRelays.map(async (relayUrl) => {
+        const relay = new NRelay1(relayUrl);
+        try {
+          console.log(`Querying ${relayUrl} with filters:`, qf);
+          const events = await relay.query([qf], { signal });
+          console.log(`Query result from ${relayUrl}:`, events.length, 'events');
+
+          // Mark each event with its relay
+          return events.map(event => ({
+            ...event,
+            relayUrl
+          }));
+        } catch (error) {
+          console.error(`Query failed for ${relayUrl}:`, error);
+          return [];
+        } finally {
+          relay.close();
+        }
+      });
+
       try {
-        console.log('Querying relay with filters:', qf);
-        const events = await relay.query([qf], { signal });
-        console.log('Query result:', events.length, 'events');
-        if (events.length > 0) {
-          const kinds = [...new Set(events.map(e => e.kind))];
+        const allResults = await Promise.all(relayPromises);
+        const allEvents = allResults.flat();
+
+        console.log('Total events from all relays:', allEvents.length);
+        if (allEvents.length > 0) {
+          const kinds = [...new Set(allEvents.map(e => e.kind))];
           console.log('Event kinds found:', kinds);
         }
-        const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
+
+        const sortedEvents = allEvents.sort((a, b) => b.created_at - a.created_at);
         setLastDisplayedEvents(sortedEvents);
         return sortedEvents;
       } catch (error) {
         console.error('Query failed:', error);
-        console.error('Query error type:', typeof error);
-        console.error('Query error details:', error);
-        
-        let errorMessage = 'Unknown error';
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            errorMessage = `Connection timed out after 10 seconds. Relay might be slow to respond.`;
-          } else {
-            errorMessage = error.message;
-          }
-        } else if (typeof error === 'string') {
-          errorMessage = error;
-        } else if (error && typeof error === 'object') {
-          errorMessage = JSON.stringify(error);
-        }
-        
-        throw new Error(`Failed to connect to relay: ${errorMessage}. Check if relay is running on ${normalizedRelayUrl}`);
-      } finally {
-        relay.close();
+        throw new Error(`Failed to connect to relays: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
-    enabled: isValidWebSocketUrl(filters.relay) && !!filters.limit,
-    staleTime: 30000, // 30 seconds
-    gcTime: 5 * 60 * 1000, // 5 minutes
+    enabled: validRelays.length > 0 && !!filters.limit,
+    staleTime: 30000,
+    gcTime: 5 * 60 * 1000,
   });
 
   // Handle streaming with optimized dependencies
   useEffect(() => {
-    if (!isStreaming || !isValidWebSocketUrl(filters.relay)) return;
+    if (!isStreaming || validRelays.length === 0) return;
 
-    // Only clear events when filters or relay have actually changed
+    // Only clear events when filters or relays have actually changed
     const currentFiltersString = JSON.stringify(queryFilters);
     const previousFiltersString = JSON.stringify(previousFiltersRef.current);
-    const relayChanged = filters.relay !== previousRelayRef.current;
-    
-    if (currentFiltersString !== previousFiltersString || relayChanged) {
+    const relaysChanged = JSON.stringify(validRelays) !== JSON.stringify(previousRelaysRef.current);
+
+    if (currentFiltersString !== previousFiltersString || relaysChanged) {
       setStreamEvents([]);
       setLastDisplayedEvents([]);
       previousFiltersRef.current = { ...queryFilters };
-      previousRelayRef.current = filters.relay;
+      previousRelaysRef.current = [...validRelays];
     }
-    
-    // Create a relay connection for streaming with normalized URL
-    const normalizedRelayUrl = normalizeRelayUrl(filters.relay);
-    const relay = new NRelay1(normalizedRelayUrl);
-    relayRef.current = relay;
 
-    // Start streaming
+    // Create relay connections for streaming
+    const relays = validRelays.map(url => new NRelay1(url));
+    relayRef.current = relays;
+
+    // Start streaming from all relays
     const controller = new AbortController();
-    
+
     console.log('Starting stream with filters:', queryFilters);
-    relay.query([queryFilters], { signal: controller.signal })
-      .then(events => {
-        console.log('Stream query result:', events.length, 'events');
-        if (events.length > 0) {
-          const kinds = [...new Set(events.map(e => e.kind))];
+    console.log('Streaming from relays:', validRelays);
+
+    // Query all relays in parallel
+    const streamPromises = validRelays.map(async (relayUrl, index) => {
+      const relay = relays[index];
+      try {
+        const events = await relay.query([queryFilters], { signal: controller.signal });
+        console.log(`Stream result from ${relayUrl}:`, events.length, 'events');
+
+        // Mark each event with its relay
+        return events.map(event => ({
+          ...event,
+          relayUrl
+        }));
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error(`Streaming error from ${relayUrl}:`, error);
+        }
+        return [];
+      }
+    });
+
+    Promise.all(streamPromises)
+      .then(allResults => {
+        const allEvents = allResults.flat();
+        console.log('Total stream events from all relays:', allEvents.length);
+        if (allEvents.length > 0) {
+          const kinds = [...new Set(allEvents.map(e => e.kind))];
           console.log('Stream event kinds found:', kinds);
         }
-        const sortedEvents = events.sort((a, b) => b.created_at - a.created_at);
+        const sortedEvents = allEvents.sort((a, b) => b.created_at - a.created_at);
         setStreamEvents(sortedEvents);
         setLastDisplayedEvents(sortedEvents);
         setError(null);
@@ -267,34 +310,34 @@ export function EventMonitor() {
 
     return () => {
       controller.abort();
-      relay.close();
-      relayRef.current = null;
+      relays.forEach(relay => relay.close());
+      relayRef.current = [];
     };
-  }, [isStreaming, filters.relay, queryFilters]);
+  }, [isStreaming, validRelays, queryFilters]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (!filters.relay) return;
-    
+    if (validRelays.length === 0) return;
+
     setError(null);
-    
+
     if (filters.limit) {
       setIsStreaming(false);
       refetch();
     } else {
       setIsStreaming(true);
     }
-  }, [filters.relay, filters.limit, refetch]);
+  }, [validRelays.length, filters.limit, refetch]);
 
 
-  // Auto-start streaming when relay is provided and no limit is set
+  // Auto-start streaming when relays are provided and no limit is set
   useEffect(() => {
-    if (filters.relay && !filters.limit) {
+    if (validRelays.length > 0 && !filters.limit) {
       setIsStreaming(true);
     } else if (filters.limit) {
       setIsStreaming(false);
     }
-  }, [filters.relay, filters.limit]);
+  }, [validRelays.length, filters.limit]);
 
 
   const displayEvents = useMemo(() => {
@@ -316,13 +359,25 @@ export function EventMonitor() {
   // Count active filters
   const activeFilters = useMemo(() => {
     return [
-      filters.kind && 'kind',
-      filters.author && 'author', 
+      filters.kinds.some(k => k.trim() !== '') && 'kind',
+      filters.authors.some(a => a.trim() !== '') && 'author',
       filters.since && 'since',
       filters.until && 'until',
       filters.tags && 'tags'
     ].filter(Boolean).length;
-  }, [filters.kind, filters.author, filters.since, filters.until, filters.tags]);
+  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags]);
+
+  // Calculate statistics per relay
+  const relayStats = useMemo(() => {
+    const stats = new Map<string, number>();
+    displayEvents.forEach(event => {
+      if (event.relayUrl) {
+        const count = stats.get(event.relayUrl) || 0;
+        stats.set(event.relayUrl, count + 1);
+      }
+    });
+    return stats;
+  }, [displayEvents]);
 
   return (
     <div className="min-h-screen bg-background p-4">
@@ -336,76 +391,174 @@ export function EventMonitor() {
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                {/* Relays */}
                 <div className="space-y-1">
-                  <ClickTooltip 
-                    content="Nostr relay URL. You can enter 'relay.damus.io' or 'wss://relay.damus.io' - both formats are accepted."
+                  <ClickTooltip
+                    content="Nostr relay URLs. You can enter 'relay.damus.io' or 'wss://relay.damus.io' - both formats are accepted."
                     showOnLabelClick={true}
                   >
-                    <Label htmlFor="relay" className="text-xs font-medium">
+                    <Label className="text-xs font-medium">
                       Relay <span className="text-red-400">*</span>
                     </Label>
                   </ClickTooltip>
-                  <Input
-                    id="relay"
-                    type="text"
-                    placeholder="relay.damus.io or wss://relay.damus.io"
-                    value={filters.relay}
-                    onChange={(e) => setFilters(prev => ({ ...prev, relay: e.target.value }))}
-                    required
-                    className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.relay ? 'border-accent/50 bg-accent/5' : ''}`}
-                  />
+                  <div className="space-y-1">
+                    {filters.relays.map((relay, index) => (
+                      <div key={index} className="flex gap-1">
+                        <Input
+                          type="text"
+                          placeholder="relay.damus.io or wss://relay.damus.io"
+                          value={relay}
+                          onChange={(e) => {
+                            const newRelays = [...filters.relays];
+                            newRelays[index] = e.target.value;
+                            setFilters(prev => ({ ...prev, relays: newRelays }));
+                          }}
+                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${relay ? 'border-accent/50 bg-accent/5' : ''}`}
+                        />
+                        {index === 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFilters(prev => ({ ...prev, relays: [...prev.relays, ''] }))}
+                            className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newRelays = filters.relays.filter((_, i) => i !== index);
+                              setFilters(prev => ({ ...prev, relays: newRelays }));
+                            }}
+                            className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                
+
+                {/* Kinds */}
                 <div className="space-y-1">
-                  <ClickTooltip 
+                  <ClickTooltip
                     content="A list of kind numbers, each representing a type of Nostr event."
                     showOnLabelClick={true}
                   >
-                    <Label htmlFor="kind" className="text-xs font-medium">Kind</Label>
+                    <Label className="text-xs font-medium">Kind</Label>
                   </ClickTooltip>
-                  <Input
-                    id="kind"
-                    type="number"
-                    min="0"
-                    placeholder="leave empty for all kinds"
-                    value={filters.kind}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      // Only allow empty string or non-negative numbers
-                      if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
-                        setFilters(prev => ({ ...prev, kind: value }));
-                      }
-                    }}
-                    onKeyDown={(e) => {
-                      // Prevent minus key from being entered
-                      if (e.key === '-' || e.key === 'e' || e.key === 'E') {
-                        e.preventDefault();
-                      }
-                    }}
-                    className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.kind ? 'border-accent/50 bg-accent/5' : ''}`}
-                  />
+                  <div className="space-y-1">
+                    {filters.kinds.map((kind, index) => (
+                      <div key={index} className="flex gap-1">
+                        <Input
+                          type="number"
+                          min="0"
+                          placeholder="leave empty for all kinds"
+                          value={kind}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
+                              const newKinds = [...filters.kinds];
+                              newKinds[index] = value;
+                              setFilters(prev => ({ ...prev, kinds: newKinds }));
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === '-' || e.key === 'e' || e.key === 'E') {
+                              e.preventDefault();
+                            }
+                          }}
+                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${kind ? 'border-accent/50 bg-accent/5' : ''}`}
+                        />
+                        {index === 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFilters(prev => ({ ...prev, kinds: [...prev.kinds, ''] }))}
+                            className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newKinds = filters.kinds.filter((_, i) => i !== index);
+                              setFilters(prev => ({ ...prev, kinds: newKinds }));
+                            }}
+                            className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                
+
+                {/* Authors */}
                 <div className="space-y-1">
-                  <ClickTooltip 
+                  <ClickTooltip
                     content="The event's pubkey must match one of these to be included."
                     showOnLabelClick={true}
                   >
-                    <Label htmlFor="author" className="text-xs font-medium">Author</Label>
+                    <Label className="text-xs font-medium">Author</Label>
                   </ClickTooltip>
-                  <Input
-                    id="author"
-                    type="text"
-                    placeholder="npub... or hex"
-                    value={filters.author}
-                    onChange={(e) => setFilters(prev => ({ ...prev, author: e.target.value }))}
-                    className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.author ? 'border-accent/50 bg-accent/5' : ''}`}
-                  />
+                  <div className="space-y-1">
+                    {filters.authors.map((author, index) => (
+                      <div key={index} className="flex gap-1">
+                        <Input
+                          type="text"
+                          placeholder="npub... or hex"
+                          value={author}
+                          onChange={(e) => {
+                            const newAuthors = [...filters.authors];
+                            newAuthors[index] = e.target.value;
+                            setFilters(prev => ({ ...prev, authors: newAuthors }));
+                          }}
+                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${author ? 'border-accent/50 bg-accent/5' : ''}`}
+                        />
+                        {index === 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFilters(prev => ({ ...prev, authors: [...prev.authors, ''] }))}
+                            className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newAuthors = filters.authors.filter((_, i) => i !== index);
+                              setFilters(prev => ({ ...prev, authors: newAuthors }));
+                            }}
+                            className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                
+
+                {/* Limit */}
                 <div className="space-y-1">
-                  <ClickTooltip 
-                    content="Maximum number of events to return."
+                  <ClickTooltip
+                    content="Maximum number of events to return per relay."
                     showOnLabelClick={true}
                   >
                     <Label htmlFor="limit" className="text-xs font-medium">Limit</Label>
@@ -418,13 +571,11 @@ export function EventMonitor() {
                     value={filters.limit}
                     onChange={(e) => {
                       const value = e.target.value;
-                      // Only allow empty string or non-negative numbers
                       if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
                         setFilters(prev => ({ ...prev, limit: value }));
                       }
                     }}
                     onKeyDown={(e) => {
-                      // Prevent minus key from being entered
                       if (e.key === '-' || e.key === 'e' || e.key === 'E') {
                         e.preventDefault();
                       }
@@ -516,30 +667,30 @@ export function EventMonitor() {
               </div>
               
               <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={!filters.relay || isStreaming} className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50">
+                <Button type="submit" disabled={validRelays.length === 0 || isStreaming} className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50">
                   {isStreaming ? 'Streaming...' : (filters.limit ? 'Fetch Events' : 'Start Stream')}
                 </Button>
                 {isStreaming && (
-                  <Button 
-                    type="button" 
-                    variant="outline" 
+                  <Button
+                    type="button"
+                    variant="outline"
                     onClick={() => setIsStreaming(false)}
                     className="h-8 px-4 text-xs bg-destructive/10 border-destructive/30 hover:bg-destructive/20"
                   >
                     Stop Searching
                   </Button>
                 )}
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => setFilters(prev => ({ 
-                    relay: prev.relay, 
-                    kind: '', 
-                    limit: '', 
-                    author: '', 
-                    since: '', 
-                    until: '', 
-                    tags: '' 
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFilters(prev => ({
+                    relays: prev.relays,
+                    kinds: [''],
+                    limit: '',
+                    authors: [''],
+                    since: '',
+                    until: '',
+                    tags: ''
                   }))}
                   className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
                 >
@@ -553,16 +704,27 @@ export function EventMonitor() {
         <Separator />
 
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-foreground">
-              Events {isStreaming ? '(Live Stream)' : `(${displayEvents.length})`}
-              {activeFilters > 0 && (
-                <span className="text-sm font-normal text-muted-foreground ml-2">
-                  • {activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
-                </span>
-              )}
-            </h2>
-            {isLoading && <span className="text-muted-foreground">Loading...</span>}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-foreground">
+                Events {isStreaming ? '(Live Stream)' : `(${displayEvents.length})`}
+                {activeFilters > 0 && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    • {activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
+                  </span>
+                )}
+              </h2>
+              {isLoading && <span className="text-muted-foreground">Loading...</span>}
+            </div>
+            {displayEvents.length > 0 && relayStats.size > 0 && (
+              <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                {Array.from(relayStats.entries()).map(([relay, count]) => (
+                  <Badge key={relay} variant="outline" className="text-xs">
+                    {relay.replace('wss://', '').replace('ws://', '')}: {count} event{count !== 1 ? 's' : ''}
+                  </Badge>
+                ))}
+              </div>
+            )}
           </div>
 
           {error && (
@@ -583,11 +745,16 @@ export function EventMonitor() {
                     {isStreaming ? 'Searching for events...' : 'Loading...'}
                   </p>
                 </div>
-                {filters.relay && (
+                {validRelays.length > 0 && (
                   <div className="text-sm text-muted-foreground space-y-2">
-                    <p>Connected to: <code className="bg-muted px-2 py-1 rounded">{filters.relay}</code></p>
+                    <p>Connected to {validRelays.length} relay{validRelays.length !== 1 ? 's' : ''}:</p>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {validRelays.map((relay, idx) => (
+                        <code key={idx} className="bg-muted px-2 py-1 rounded text-xs">{relay}</code>
+                      ))}
+                    </div>
                     <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded">
-                      {filters.kind ? filters.kind : 'all kinds'}
+                      {filters.kinds.filter(k => k.trim() !== '').join(', ') || 'all kinds'}
                     </code></p>
                   </div>
                 )}
@@ -599,13 +766,18 @@ export function EventMonitor() {
             <Card className="border-dashed">
               <CardContent className="py-12 text-center space-y-4">
                 <p className="text-muted-foreground">
-                  {filters.relay ? 'No events found' : 'Enter a relay URL to start monitoring'}
+                  {validRelays.length > 0 ? 'No events found' : 'Enter a relay URL to start monitoring'}
                 </p>
-                {filters.relay && (
+                {validRelays.length > 0 && (
                   <div className="text-sm text-muted-foreground space-y-2">
-                    <p>Connected to: <code className="bg-muted px-2 py-1 rounded">{filters.relay}</code></p>
+                    <p>Connected to {validRelays.length} relay{validRelays.length !== 1 ? 's' : ''}:</p>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {validRelays.map((relay, idx) => (
+                        <code key={idx} className="bg-muted px-2 py-1 rounded text-xs">{relay}</code>
+                      ))}
+                    </div>
                     <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded">
-                      {filters.kind ? filters.kind : 'all kinds'}
+                      {filters.kinds.filter(k => k.trim() !== '').join(', ') || 'all kinds'}
                     </code></p>
                     <div className="text-xs space-y-1">
                       <p>💡 <strong>Troubleshooting tips:</strong></p>
@@ -624,6 +796,14 @@ export function EventMonitor() {
 
           {displayEvents.map((event, index) => (
             <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
+              {event.relayUrl && (
+                <Badge
+                  variant="secondary"
+                  className="absolute top-2 left-2 z-10 text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
+                >
+                  {event.relayUrl.replace('wss://', '').replace('ws://', '')}
+                </Badge>
+              )}
               <Button
                 variant="ghost"
                 size="sm"
@@ -637,7 +817,7 @@ export function EventMonitor() {
                   <Copy className="h-4 w-4" />
                 )}
               </Button>
-              <CardContent className="p-4">
+              <CardContent className="p-4 pt-10">
                 <JsonViewer data={event} />
               </CardContent>
             </Card>

@@ -12,6 +12,8 @@ import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { Copy, Check, Plus, X } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface EventFilters {
   relays: string[];
@@ -89,6 +91,11 @@ export function EventMonitor() {
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [nipFilter, setNipFilter] = useState<string[]>(['']);
+  const [nipKinds, setNipKinds] = useState<number[]>([]);
+  const [nipMessage, setNipMessage] = useState<string | null>(null);
+  const [kindsExpanded, setKindsExpanded] = useState(false);
+  const nipActiveRef = useRef(false);
   const relayRef = useRef<NRelay1[]>([]);
   const previousFiltersRef = useRef<NostrFilter>({});
   const previousRelaysRef = useRef<string[]>(filters.relays);
@@ -98,10 +105,14 @@ export function EventMonitor() {
   const queryFilters = useMemo(() => {
     const qf: NostrFilter = {};
 
-    // Filter out empty strings and parse kinds
-    const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
-    if (validKinds.length > 0) {
-      qf.kinds = validKinds;
+    // If NIP filter is active, use nipKinds; otherwise use manual kinds
+    if (nipActiveRef.current && nipKinds.length > 0) {
+      qf.kinds = nipKinds;
+    } else {
+      const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
+      if (validKinds.length > 0) {
+        qf.kinds = validKinds;
+      }
     }
 
     // Filter out empty strings and decode authors
@@ -139,7 +150,7 @@ export function EventMonitor() {
     }
 
     return qf;
-  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags, filters.limit]);
+  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags, filters.limit, nipKinds]);
 
   // Get valid relays
   const validRelays = useMemo(() => {
@@ -148,9 +159,16 @@ export function EventMonitor() {
       .map(r => normalizeRelayUrl(r));
   }, [filters.relays]);
 
+  // Clear "Enter a relay first" message when relay becomes valid
+  useEffect(() => {
+    if (validRelays.length > 0 && nipMessage === 'Enter a relay first') {
+      setNipMessage(null);
+    }
+  }, [validRelays.length, nipMessage]);
+
   // Query for limited events from multiple relays
   const { data: events, isLoading, refetch } = useQuery({
-    queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags],
+    queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags, nipKinds],
     queryFn: async (c) => {
       if (validRelays.length === 0) return [];
 
@@ -159,9 +177,13 @@ export function EventMonitor() {
       // Build query filters
       const qf: NostrFilter = {};
 
-      const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
-      if (validKinds.length > 0) {
-        qf.kinds = validKinds;
+      if (nipActiveRef.current && nipKinds.length > 0) {
+        qf.kinds = nipKinds;
+      } else {
+        const validKinds = filters.kinds.filter(k => k.trim() !== '').map(k => parseInt(k));
+        if (validKinds.length > 0) {
+          qf.kinds = validKinds;
+        }
       }
 
       const validAuthors = filters.authors
@@ -229,6 +251,20 @@ export function EventMonitor() {
 
         const sortedEvents = allEvents.sort((a, b) => b.created_at - a.created_at);
         setLastDisplayedEvents(sortedEvents);
+
+        // If NIP filter is active, populate kinds with found event kinds
+        if (nipActiveRef.current && allEvents.length > 0) {
+          const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
+          const foundKindsStr = foundKinds.map(String);
+          setFilters(prev => {
+            const current = prev.kinds.filter(k => k.trim() !== '').sort();
+            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+              return prev;
+            }
+            return { ...prev, kinds: foundKindsStr };
+          });
+        }
+
         return sortedEvents;
       } catch (error) {
         console.error('Query failed:', error);
@@ -298,6 +334,19 @@ export function EventMonitor() {
         setStreamEvents(sortedEvents);
         setLastDisplayedEvents(sortedEvents);
         setError(null);
+
+        // If NIP filter is active, populate kinds with found event kinds
+        if (nipActiveRef.current && allEvents.length > 0) {
+          const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
+          const foundKindsStr = foundKinds.map(String);
+          setFilters(prev => {
+            const current = prev.kinds.filter(k => k.trim() !== '').sort();
+            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+              return prev;
+            }
+            return { ...prev, kinds: foundKindsStr };
+          });
+        }
       })
       .catch(error => {
         if (!controller.signal.aborted) {
@@ -357,13 +406,14 @@ export function EventMonitor() {
   // Count active filters
   const activeFilters = useMemo(() => {
     return [
-      filters.kinds.some(k => k.trim() !== '') && 'kind',
+      (filters.kinds.some(k => k.trim() !== '') || nipActiveRef.current) && 'kind',
       filters.authors.some(a => a.trim() !== '') && 'author',
       filters.since && 'since',
       filters.until && 'until',
-      filters.tags.some(t => t.trim() !== '') && 'tags'
+      filters.tags.some(t => t.trim() !== '') && 'tags',
+      nipFilter.some(n => n.trim() !== '') && 'nip'
     ].filter(Boolean).length;
-  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags]);
+  }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags, nipFilter]);
 
   // Calculate statistics per relay
   const relayStats = useMemo(() => {
@@ -396,7 +446,7 @@ export function EventMonitor() {
                     showOnLabelClick={true}
                   >
                     <Label className="text-xs font-medium">
-                      Relay <span className="text-red-400">*</span>
+                      Relay <span className="text-accent/70 text-[10px]">(required)</span>
                     </Label>
                   </ClickTooltip>
                   <div className="space-y-1">
@@ -451,11 +501,12 @@ export function EventMonitor() {
                     <Label className="text-xs font-medium">Kind</Label>
                   </ClickTooltip>
                   <div className="space-y-1">
-                    {filters.kinds.map((kind, index) => (
+                    {(kindsExpanded ? filters.kinds : filters.kinds.slice(0, 3)).map((kind, index) => (
                       <div key={index} className="flex gap-1">
                         <Input
                           type="number"
                           min="0"
+
                           placeholder="leave empty for all kinds"
                           value={kind}
                           onChange={(e) => {
@@ -464,6 +515,12 @@ export function EventMonitor() {
                               const newKinds = [...filters.kinds];
                               newKinds[index] = value;
                               setFilters(prev => ({ ...prev, kinds: newKinds }));
+                              if (nipActiveRef.current) {
+                                nipActiveRef.current = false;
+                                setNipFilter(['']);
+                                setNipKinds([]);
+                                setNipMessage(null);
+                              }
                             }
                           }}
                           onKeyDown={(e) => {
@@ -478,7 +535,16 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setFilters(prev => ({ ...prev, kinds: [...prev.kinds, ''] }))}
+  
+                            onClick={() => {
+                              setFilters(prev => ({ ...prev, kinds: [...prev.kinds, ''] }));
+                              if (nipActiveRef.current) {
+                                nipActiveRef.current = false;
+                                setNipFilter(['']);
+                                setNipKinds([]);
+                                setNipMessage(null);
+                              }
+                            }}
                             className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
                           >
                             <Plus className="h-3 w-3" />
@@ -488,9 +554,16 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
+  
                             onClick={() => {
                               const newKinds = filters.kinds.filter((_, i) => i !== index);
                               setFilters(prev => ({ ...prev, kinds: newKinds }));
+                              if (nipActiveRef.current) {
+                                nipActiveRef.current = false;
+                                setNipFilter(['']);
+                                setNipKinds([]);
+                                setNipMessage(null);
+                              }
                             }}
                             className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
                           >
@@ -499,6 +572,25 @@ export function EventMonitor() {
                         )}
                       </div>
                     ))}
+                    {filters.kinds.length > 3 && (
+                      <button
+                        type="button"
+                        onClick={() => setKindsExpanded(prev => !prev)}
+                        className="flex items-center gap-1 text-xs text-accent hover:underline"
+                      >
+                        {kindsExpanded ? (
+                          <>
+                            <ChevronUp className="h-3 w-3" />
+                            Show less
+                          </>
+                        ) : (
+                          <>
+                            <ChevronDown className="h-3 w-3" />
+                            Show {filters.kinds.length - 3} more kinds
+                          </>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -515,6 +607,7 @@ export function EventMonitor() {
                       <div key={index} className="flex gap-1">
                         <Input
                           type="text"
+
                           placeholder="npub... or hex"
                           value={author}
                           onChange={(e) => {
@@ -529,6 +622,7 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
+  
                             onClick={() => setFilters(prev => ({ ...prev, authors: [...prev.authors, ''] }))}
                             className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
                           >
@@ -539,6 +633,7 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
+  
                             onClick={() => {
                               const newAuthors = filters.authors.filter((_, i) => i !== index);
                               setFilters(prev => ({ ...prev, authors: newAuthors }));
@@ -597,6 +692,7 @@ export function EventMonitor() {
                         <Input
                           id={index === 0 ? "tags" : undefined}
                           type="text"
+
                           placeholder="id:event-id"
                           value={tag}
                           onChange={(e) => {
@@ -611,6 +707,7 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
+  
                             onClick={() => setFilters(prev => ({ ...prev, tags: [...prev.tags, ''] }))}
                             className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
                           >
@@ -621,6 +718,7 @@ export function EventMonitor() {
                             type="button"
                             variant="outline"
                             size="sm"
+  
                             onClick={() => {
                               const newTags = filters.tags.filter((_, i) => i !== index);
                               setFilters(prev => ({ ...prev, tags: newTags }));
@@ -715,19 +813,164 @@ export function EventMonitor() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setFilters(prev => ({
-                    relays: prev.relays,
-                    kinds: [''],
-                    limit: '',
-                    authors: [''],
-                    since: '',
-                    until: '',
-                    tags: ['']
-                  }))}
+                  onClick={() => {
+                    setFilters(prev => ({
+                      relays: prev.relays,
+                      kinds: [''],
+                      limit: '',
+                      authors: [''],
+                      since: '',
+                      until: '',
+                      tags: ['']
+                    }));
+                    nipActiveRef.current = false;
+                    setNipFilter(['']);
+                    setNipKinds([]);
+                    setNipMessage(null);
+                    setKindsExpanded(false);
+                  }}
                   className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
                 >
                   Clear Filters
                 </Button>
+              </div>
+
+              <div className="space-y-1 pt-2">
+                <Label className="text-xs font-medium">Search by NIP</Label>
+                <div className="space-y-1">
+                  {nipFilter.map((nip, index) => (
+                    <div key={index} className="flex gap-1">
+                      <Input
+                        type="text"
+                        placeholder="e.g. 69 or 5A"
+                        value={nip}
+                        onChange={(e) => {
+                          const value = e.target.value.toUpperCase();
+                          if (value === '' || /^[0-9A-F]+$/.test(value)) {
+                            const newNips = [...nipFilter];
+                            newNips[index] = value;
+                            setNipFilter(newNips);
+                            if (nipMessage) setNipMessage(null);
+                          }
+                        }}
+                        className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 max-w-[200px] ${nip ? 'border-accent/50 bg-accent/5' : ''}`}
+                      />
+                      {index === 0 ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+
+                          onClick={() => setNipFilter(prev => [...prev, ''])}
+                          className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+
+                          onClick={() => {
+                            const newNips = nipFilter.filter((_, i) => i !== index);
+                            setNipFilter(newNips);
+                          }}
+                          className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      )}
+                      {index === 0 && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+
+                          onClick={() => {
+                            const validNips = nipFilter.filter(n => n.trim() !== '');
+                            if (validNips.length === 0) return;
+
+                            if (validRelays.length === 0) {
+                              setNipMessage('Enter a relay first');
+                              return;
+                            }
+
+                            // Check if NIPs exist
+                            const notFound: string[] = [];
+                            const noKinds: string[] = [];
+                            const allKinds: number[] = [];
+
+                            for (const n of validNips) {
+                              const nipInfo = getNipInfo(n.trim());
+                              if (!nipInfo) {
+                                notFound.push(n.trim());
+                                continue;
+                              }
+                              const kinds = getKindsForNip(n.trim());
+                              if (kinds.length === 0) {
+                                noKinds.push(n.trim());
+                              }
+                              for (const k of kinds) {
+                                if (!allKinds.includes(k)) allKinds.push(k);
+                              }
+                            }
+                            allKinds.sort((a, b) => a - b);
+
+                            if (notFound.length > 0) {
+                              nipActiveRef.current = false;
+                              setNipKinds([]);
+                              setNipMessage(`NIP-${notFound.join(', NIP-')} not found`);
+                              return;
+                            }
+
+                            if (allKinds.length === 0) {
+                              nipActiveRef.current = false;
+                              setNipKinds([]);
+                              const nipNames = noKinds.map(n => {
+                                const info = getNipInfo(n);
+                                return info ? `NIP-${n} (${info.name})` : `NIP-${n}`;
+                              });
+                              setNipMessage(`${nipNames.join(', ')} — no associated event kinds`);
+                              return;
+                            }
+
+                            // Show partial message if some NIPs had no kinds
+                            if (noKinds.length > 0) {
+                              const nipNames = noKinds.map(n => {
+                                const info = getNipInfo(n);
+                                return info ? `NIP-${n}` : `NIP-${n}`;
+                              });
+                              setNipMessage(`${nipNames.join(', ')} — no associated event kinds. Searching remaining NIPs.`);
+                            } else {
+                              setNipMessage(null);
+                            }
+
+                            nipActiveRef.current = true;
+                            setNipKinds(allKinds);
+                            setFilters(prev => ({ ...prev, kinds: [''] }));
+                            setKindsExpanded(false);
+                            setError(null);
+
+                            // Trigger query/streaming
+                            if (filters.limit) {
+                              setTimeout(() => refetch(), 0);
+                            } else if (validRelays.length > 0) {
+                              setIsStreaming(false);
+                              setTimeout(() => setIsStreaming(true), 0);
+                            }
+                          }}
+                          className="h-8 px-3 text-xs bg-accent/80 hover:bg-accent border-accent/50"
+                        >
+                          Search
+                        </Button>
+                      )}
+                      {index === 0 && nipMessage && (
+                        <span className="text-xs text-muted-foreground self-center whitespace-nowrap">{nipMessage}</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
               </form>
           </CardContent>
@@ -755,6 +998,28 @@ export function EventMonitor() {
                     {relay.replace('wss://', '').replace('ws://', '')}: {count} event{count !== 1 ? 's' : ''}
                   </Badge>
                 ))}
+              </div>
+            )}
+            {filters.kinds.some(k => k.trim() !== '') && (
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {filters.kinds.filter(k => k.trim() !== '').map((k, index) => {
+                  const kind = parseInt(k);
+                  if (isNaN(kind)) return null;
+                  const info = getKindInfo(kind);
+                  return (
+                    <div key={index}>
+                      Event kind {kind}:{' '}
+                      {info.link ? (
+                        <a href={info.link} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                          {info.nip} {info.description}
+                        </a>
+                      ) : (
+                        <span>{info.description}</span>
+                      )}
+                      . Event <a href="https://github.com/nostr-protocol/nips/blob/master/01.md#kinds" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{info.classification}</a>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

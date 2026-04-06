@@ -20,7 +20,7 @@ interface EventFilters {
   authors: string[];
   since: string;
   until: string;
-  tags: string;
+  tags: string[];
 }
 
 interface EventWithRelay extends NostrEvent {
@@ -83,7 +83,7 @@ export function EventMonitor() {
     authors: [''],
     since: '',
     until: '',
-    tags: ''
+    tags: ['']
   });
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
@@ -120,15 +120,14 @@ export function EventMonitor() {
       qf.until = parseInt(filters.until);
     }
 
-    if (filters.tags) {
-      // Parse tags in format "tagname:value,tagname2:value2"
-      const tagPairs = filters.tags.split(',').map(pair => pair.trim()).filter(Boolean);
-      for (const pair of tagPairs) {
-        const [tagName, tagValue] = pair.split(':').map(s => s.trim());
-        if (tagName && tagValue) {
-          const filterKey = `#${tagName}` as keyof NostrFilter;
-          qf[filterKey] = [tagValue] as never;
-        }
+    // Parse tags - each entry is "tagname:value"
+    const validTags = filters.tags.filter(t => t.trim() !== '');
+    for (const tag of validTags) {
+      const [tagName, tagValue] = tag.split(':').map(s => s.trim());
+      if (tagName && tagValue) {
+        const filterKey = `#${tagName}` as keyof NostrFilter;
+        const existing = qf[filterKey] as string[] | undefined;
+        qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;
       }
     }
 
@@ -180,14 +179,13 @@ export function EventMonitor() {
         qf.until = parseInt(filters.until);
       }
 
-      if (filters.tags) {
-        const tagPairs = filters.tags.split(',').map(pair => pair.trim()).filter(Boolean);
-        for (const pair of tagPairs) {
-          const [tagName, tagValue] = pair.split(':').map(s => s.trim());
-          if (tagName && tagValue) {
-            const filterKey = `#${tagName}` as keyof NostrFilter;
-            qf[filterKey] = [tagValue] as never;
-          }
+      const validTags = filters.tags.filter(t => t.trim() !== '');
+      for (const tag of validTags) {
+        const [tagName, tagValue] = tag.split(':').map(s => s.trim());
+        if (tagName && tagValue) {
+          const filterKey = `#${tagName}` as keyof NostrFilter;
+          const existing = qf[filterKey] as string[] | undefined;
+          qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;
         }
       }
 
@@ -363,7 +361,7 @@ export function EventMonitor() {
       filters.authors.some(a => a.trim() !== '') && 'author',
       filters.since && 'since',
       filters.until && 'until',
-      filters.tags && 'tags'
+      filters.tags.some(t => t.trim() !== '') && 'tags'
     ].filter(Boolean).length;
   }, [filters.kinds, filters.authors, filters.since, filters.until, filters.tags]);
 
@@ -587,20 +585,54 @@ export function EventMonitor() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <ClickTooltip 
-                    content="Filter events by specific tags."
+                  <ClickTooltip
+                    content="Filter events by specific tags. Format: tagname:value (e.g. id:event-id)"
                     showOnLabelClick={true}
                   >
                     <Label htmlFor="tags" className="text-xs font-medium">Tags</Label>
                   </ClickTooltip>
-                  <Input
-                    id="tags"
-                    type="text"
-                    placeholder="t:bitcoin,p:pubkey"
-                    value={filters.tags}
-                    onChange={(e) => setFilters(prev => ({ ...prev, tags: e.target.value }))}
-                    className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.tags ? 'border-accent/50 bg-accent/5' : ''}`}
-                  />
+                  <div className="space-y-1">
+                    {filters.tags.map((tag, index) => (
+                      <div key={index} className="flex gap-1">
+                        <Input
+                          id={index === 0 ? "tags" : undefined}
+                          type="text"
+                          placeholder="id:event-id"
+                          value={tag}
+                          onChange={(e) => {
+                            const newTags = [...filters.tags];
+                            newTags[index] = e.target.value;
+                            setFilters(prev => ({ ...prev, tags: newTags }));
+                          }}
+                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${tag ? 'border-accent/50 bg-accent/5' : ''}`}
+                        />
+                        {index === 0 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setFilters(prev => ({ ...prev, tags: [...prev.tags, ''] }))}
+                            className="h-8 w-8 p-0 border-accent/30 bg-transparent hover:bg-accent/10"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const newTags = filters.tags.filter((_, i) => i !== index);
+                              setFilters(prev => ({ ...prev, tags: newTags }));
+                            }}
+                            className="h-8 w-8 p-0 border-destructive/30 bg-transparent hover:bg-destructive/10"
+                          >
+                            <X className="h-3 w-3" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
                 </div>
                 
                 <div className="space-y-1">
@@ -690,7 +722,7 @@ export function EventMonitor() {
                     authors: [''],
                     since: '',
                     until: '',
-                    tags: ''
+                    tags: ['']
                   }))}
                   className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
                 >

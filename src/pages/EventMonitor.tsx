@@ -841,22 +841,16 @@ export function EventMonitor() {
                   {nipFilter.map((nip, index) => (
                     <div key={index} className="flex gap-1">
                       <Input
-                        type="number"
-                        min="0"
-                        placeholder="e.g. 69"
+                        type="text"
+                        placeholder="e.g. 69 or 5A"
                         value={nip}
                         onChange={(e) => {
-                          const value = e.target.value;
-                          if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
+                          const value = e.target.value.toUpperCase();
+                          if (value === '' || /^[0-9A-F]+$/.test(value)) {
                             const newNips = [...nipFilter];
                             newNips[index] = value;
                             setNipFilter(newNips);
                             if (nipMessage) setNipMessage(null);
-                          }
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '.') {
-                            e.preventDefault();
                           }
                         }}
                         className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 max-w-[200px] ${nip ? 'border-accent/50 bg-accent/5' : ''}`}
@@ -961,7 +955,7 @@ export function EventMonitor() {
                             // Trigger query/streaming
                             if (filters.limit) {
                               setTimeout(() => refetch(), 0);
-                            } else {
+                            } else if (validRelays.length > 0) {
                               setIsStreaming(false);
                               setTimeout(() => setIsStreaming(true), 0);
                             }

@@ -12,6 +12,7 @@ import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { Copy, Check, Plus, X } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { getKindInfo } from '@/data/kindInfo';
 
 interface EventFilters {
   relays: string[];
@@ -755,6 +756,28 @@ export function EventMonitor() {
                     {relay.replace('wss://', '').replace('ws://', '')}: {count} event{count !== 1 ? 's' : ''}
                   </Badge>
                 ))}
+              </div>
+            )}
+            {filters.kinds.some(k => k.trim() !== '') && (
+              <div className="text-xs text-muted-foreground space-y-0.5">
+                {filters.kinds.filter(k => k.trim() !== '').map((k, index) => {
+                  const kind = parseInt(k);
+                  if (isNaN(kind)) return null;
+                  const info = getKindInfo(kind);
+                  return (
+                    <div key={index}>
+                      Event kind {kind}:{' '}
+                      {info.link ? (
+                        <a href={info.link} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                          {info.nip} {info.description}
+                        </a>
+                      ) : (
+                        <span>{info.description}</span>
+                      )}
+                      . Event {info.classification}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

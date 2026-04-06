@@ -159,6 +159,13 @@ export function EventMonitor() {
       .map(r => normalizeRelayUrl(r));
   }, [filters.relays]);
 
+  // Clear "Enter a relay first" message when relay becomes valid
+  useEffect(() => {
+    if (validRelays.length > 0 && nipMessage === 'Enter a relay first') {
+      setNipMessage(null);
+    }
+  }, [validRelays.length, nipMessage]);
+
   // Query for limited events from multiple relays
   const { data: events, isLoading, refetch } = useQuery({
     queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags, nipKinds],
@@ -431,9 +438,6 @@ export function EventMonitor() {
           </CardHeader>
           <CardContent className="pt-0">
             <form onSubmit={handleSubmit} className="space-y-3">
-              {validRelays.length === 0 && (filters.kinds.some(k => k.trim() !== '') || filters.authors.some(a => a.trim() !== '') || filters.limit || filters.since || filters.until || filters.tags.some(t => t.trim() !== '') || nipFilter.some(n => n.trim() !== '')) && (
-                <p className="text-xs text-amber-400">Enter a relay first</p>
-              )}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 {/* Relays */}
                 <div className="space-y-1">
@@ -442,7 +446,7 @@ export function EventMonitor() {
                     showOnLabelClick={true}
                   >
                     <Label className="text-xs font-medium">
-                      Relay <span className="text-red-400">*</span>
+                      Relay <span className="text-accent/70 text-[10px]">(required)</span>
                     </Label>
                   </ClickTooltip>
                   <div className="space-y-1">
@@ -893,6 +897,11 @@ export function EventMonitor() {
                             const validNips = nipFilter.filter(n => n.trim() !== '');
                             if (validNips.length === 0) return;
 
+                            if (validRelays.length === 0) {
+                              setNipMessage('Enter a relay first');
+                              return;
+                            }
+
                             // Check if NIPs exist
                             const notFound: string[] = [];
                             const noKinds: string[] = [];
@@ -962,12 +971,12 @@ export function EventMonitor() {
                           Search
                         </Button>
                       )}
+                      {index === 0 && nipMessage && (
+                        <span className="text-xs text-muted-foreground self-center whitespace-nowrap">{nipMessage}</span>
+                      )}
                     </div>
                   ))}
                 </div>
-                {nipMessage && (
-                  <p className="text-xs text-muted-foreground">{nipMessage}</p>
-                )}
               </div>
               </form>
           </CardContent>

@@ -774,7 +774,7 @@ export function EventMonitor() {
                       ) : (
                         <span>{info.description}</span>
                       )}
-                      . Event {info.classification}
+                      . Event <a href="https://github.com/nostr-protocol/nips/blob/master/01.md#kinds" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">{info.classification}</a>
                     </div>
                   );
                 })}

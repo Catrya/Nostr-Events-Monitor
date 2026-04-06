@@ -338,18 +338,18 @@ function getKindClassification(kind: number): string {
 }
 
 export function getKindsForNip(nipId: string): number[] {
-  const normalizedNip = nipId.toUpperCase().replace(/^0+/, '');
+  const normalizedNip = normalizeNipId(nipId);
   const kinds: number[] = [];
 
   for (const [kindStr, entry] of Object.entries(KIND_MAP)) {
-    const entryNip = entry.nip.replace(/^NIP-/, '').replace(/^0+/, '').toUpperCase();
+    const entryNip = normalizeNipId(entry.nip);
     if (entryNip === normalizedNip) {
       kinds.push(parseInt(kindStr));
     }
   }
 
   for (const range of KIND_RANGES) {
-    const rangeNip = range.nip.replace(/^NIP-/, '').replace(/^0+/, '').toUpperCase();
+    const rangeNip = normalizeNipId(range.nip);
     if (rangeNip === normalizedNip) {
       for (let i = range.min; i <= range.max; i++) {
         if (!kinds.includes(i)) {

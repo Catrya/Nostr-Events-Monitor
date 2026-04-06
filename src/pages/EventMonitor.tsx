@@ -248,7 +248,14 @@ export function EventMonitor() {
         // If NIP filter is active, populate kinds with found event kinds
         if (nipActiveRef.current && allEvents.length > 0) {
           const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
-          setFilters(prev => ({ ...prev, kinds: foundKinds.map(String) }));
+          const foundKindsStr = foundKinds.map(String);
+          setFilters(prev => {
+            const current = prev.kinds.filter(k => k.trim() !== '').sort();
+            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+              return prev;
+            }
+            return { ...prev, kinds: foundKindsStr };
+          });
         }
 
         return sortedEvents;
@@ -324,7 +331,14 @@ export function EventMonitor() {
         // If NIP filter is active, populate kinds with found event kinds
         if (nipActiveRef.current && allEvents.length > 0) {
           const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
-          setFilters(prev => ({ ...prev, kinds: foundKinds.map(String) }));
+          const foundKindsStr = foundKinds.map(String);
+          setFilters(prev => {
+            const current = prev.kinds.filter(k => k.trim() !== '').sort();
+            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+              return prev;
+            }
+            return { ...prev, kinds: foundKindsStr };
+          });
         }
       })
       .catch(error => {
@@ -823,14 +837,23 @@ export function EventMonitor() {
                   {nipFilter.map((nip, index) => (
                     <div key={index} className="flex gap-1">
                       <Input
-                        type="text"
+                        type="number"
+                        min="0"
                         placeholder="e.g. 69"
                         value={nip}
                         onChange={(e) => {
-                          const newNips = [...nipFilter];
-                          newNips[index] = e.target.value;
-                          setNipFilter(newNips);
-                          if (nipMessage) setNipMessage(null);
+                          const value = e.target.value;
+                          if (value === '' || (!isNaN(Number(value)) && Number(value) >= 0)) {
+                            const newNips = [...nipFilter];
+                            newNips[index] = value;
+                            setNipFilter(newNips);
+                            if (nipMessage) setNipMessage(null);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E' || e.key === '.') {
+                            e.preventDefault();
+                          }
                         }}
                         className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 max-w-[200px] ${nip ? 'border-accent/50 bg-accent/5' : ''}`}
                       />
@@ -892,11 +915,15 @@ export function EventMonitor() {
                             allKinds.sort((a, b) => a - b);
 
                             if (notFound.length > 0) {
+                              nipActiveRef.current = false;
+                              setNipKinds([]);
                               setNipMessage(`NIP-${notFound.join(', NIP-')} not found`);
                               return;
                             }
 
                             if (allKinds.length === 0) {
+                              nipActiveRef.current = false;
+                              setNipKinds([]);
                               const nipNames = noKinds.map(n => {
                                 const info = getNipInfo(n);
                                 return info ? `NIP-${n} (${info.name})` : `NIP-${n}`;

@@ -14,6 +14,111 @@ function nipLink(nip: string): string {
   return `${NIP_BASE}${nip}.md`;
 }
 
+// All known NIPs with their file identifiers
+const VALID_NIPS: Record<string, { name: string; file: string }> = {
+  '01': { name: 'Basic protocol flow description', file: '01' },
+  '02': { name: 'Follow List', file: '02' },
+  '03': { name: 'OpenTimestamps Attestations for Events', file: '03' },
+  '04': { name: 'Encrypted Direct Message', file: '04' },
+  '05': { name: 'Mapping Nostr keys to DNS-based internet identifiers', file: '05' },
+  '06': { name: 'Basic key derivation from mnemonic seed phrase', file: '06' },
+  '07': { name: 'window.nostr capability for web browsers', file: '07' },
+  '09': { name: 'Event Deletion Request', file: '09' },
+  '10': { name: 'Text Notes and Threads', file: '10' },
+  '11': { name: 'Relay Information Document', file: '11' },
+  '13': { name: 'Proof of Work', file: '13' },
+  '14': { name: 'Subject tag in text events', file: '14' },
+  '15': { name: 'Nostr Marketplace', file: '15' },
+  '17': { name: 'Private Direct Messages', file: '17' },
+  '18': { name: 'Reposts', file: '18' },
+  '19': { name: 'bech32-encoded entities', file: '19' },
+  '21': { name: 'nostr: URI scheme', file: '21' },
+  '22': { name: 'Comment', file: '22' },
+  '23': { name: 'Long-form Content', file: '23' },
+  '24': { name: 'Extra metadata fields and tags', file: '24' },
+  '25': { name: 'Reactions', file: '25' },
+  '27': { name: 'Text Note References', file: '27' },
+  '28': { name: 'Public Chat', file: '28' },
+  '29': { name: 'Relay-based Groups', file: '29' },
+  '30': { name: 'Custom Emoji', file: '30' },
+  '31': { name: 'Dealing with Unknown Events', file: '31' },
+  '32': { name: 'Labeling', file: '32' },
+  '34': { name: 'git stuff', file: '34' },
+  '35': { name: 'Torrents', file: '35' },
+  '36': { name: 'Sensitive Content', file: '36' },
+  '37': { name: 'Draft Events', file: '37' },
+  '38': { name: 'User Statuses', file: '38' },
+  '39': { name: 'External Identities in Profiles', file: '39' },
+  '40': { name: 'Expiration Timestamp', file: '40' },
+  '42': { name: 'Authentication of clients to relays', file: '42' },
+  '43': { name: 'Relay Access Metadata and Requests', file: '43' },
+  '44': { name: 'Encrypted Payloads (Versioned)', file: '44' },
+  '45': { name: 'Counting results', file: '45' },
+  '46': { name: 'Nostr Remote Signing', file: '46' },
+  '47': { name: 'Nostr Wallet Connect', file: '47' },
+  '48': { name: 'Proxy Tags', file: '48' },
+  '49': { name: 'Private Key Encryption', file: '49' },
+  '50': { name: 'Search Capability', file: '50' },
+  '51': { name: 'Lists', file: '51' },
+  '52': { name: 'Calendar Events', file: '52' },
+  '53': { name: 'Live Activities', file: '53' },
+  '54': { name: 'Wiki', file: '54' },
+  '55': { name: 'Android Signer Application', file: '55' },
+  '56': { name: 'Reporting', file: '56' },
+  '57': { name: 'Lightning Zaps', file: '57' },
+  '58': { name: 'Badges', file: '58' },
+  '59': { name: 'Gift Wrap', file: '59' },
+  '5A': { name: 'Pubkey Static Websites', file: '5A' },
+  '60': { name: 'Cashu Wallet', file: '60' },
+  '61': { name: 'Nutzaps', file: '61' },
+  '62': { name: 'Request to Vanish', file: '62' },
+  '64': { name: 'Chess (PGN)', file: '64' },
+  '65': { name: 'Relay List Metadata', file: '65' },
+  '66': { name: 'Relay Discovery and Liveness Monitoring', file: '66' },
+  '68': { name: 'Picture-first feeds', file: '68' },
+  '69': { name: 'Peer-to-peer Order events', file: '69' },
+  '70': { name: 'Protected Events', file: '70' },
+  '71': { name: 'Video Events', file: '71' },
+  '72': { name: 'Moderated Communities', file: '72' },
+  '73': { name: 'External Content IDs', file: '73' },
+  '75': { name: 'Zap Goals', file: '75' },
+  '77': { name: 'Negentropy Syncing', file: '77' },
+  '78': { name: 'Application-specific data', file: '78' },
+  '7D': { name: 'Threads', file: '7D' },
+  '84': { name: 'Highlights', file: '84' },
+  '85': { name: 'Trusted Assertions', file: '85' },
+  '86': { name: 'Relay Management API', file: '86' },
+  '87': { name: 'Ecash Mint Discoverability', file: '87' },
+  '88': { name: 'Polls', file: '88' },
+  '89': { name: 'Recommended Application Handlers', file: '89' },
+  '90': { name: 'Data Vending Machines', file: '90' },
+  '92': { name: 'Media Attachments', file: '92' },
+  '94': { name: 'File Metadata', file: '94' },
+  '96': { name: 'HTTP File Storage Integration', file: '96' },
+  '98': { name: 'HTTP Auth', file: '98' },
+  '99': { name: 'Classified Listings', file: '99' },
+  'A0': { name: 'Voice Messages', file: 'A0' },
+  'A4': { name: 'Public Messages', file: 'A4' },
+  'B0': { name: 'Web Bookmarks', file: 'B0' },
+  'B7': { name: 'Blossom', file: 'B7' },
+  'C0': { name: 'Code Snippets', file: 'C0' },
+  'C7': { name: 'Chats', file: 'C7' },
+};
+
+function normalizeNipId(nipId: string): string {
+  const cleaned = nipId.trim().toUpperCase().replace(/^NIP-?/i, '');
+  // Pad single digit numbers with leading zero for lookup
+  if (/^\d$/.test(cleaned)) return '0' + cleaned;
+  return cleaned;
+}
+
+export function getNipInfo(nipId: string): { exists: boolean; name: string; link: string } | null {
+  const normalized = normalizeNipId(nipId);
+  const nip = VALID_NIPS[normalized];
+  if (!nip) return null;
+  return { exists: true, name: nip.name, link: nipLink(nip.file) };
+}
+
 const KIND_MAP: Record<number, KindEntry> = {
   0:     { nip: 'NIP-01', description: 'User Metadata', link: nipLink('01') },
   1:     { nip: 'NIP-10', description: 'Short Text Note', link: nipLink('10') },
@@ -230,6 +335,31 @@ function getKindClassification(kind: number): string {
     return 'addressable';
   }
   return 'regular';
+}
+
+export function getKindsForNip(nipId: string): number[] {
+  const normalizedNip = nipId.toUpperCase().replace(/^0+/, '');
+  const kinds: number[] = [];
+
+  for (const [kindStr, entry] of Object.entries(KIND_MAP)) {
+    const entryNip = entry.nip.replace(/^NIP-/, '').replace(/^0+/, '').toUpperCase();
+    if (entryNip === normalizedNip) {
+      kinds.push(parseInt(kindStr));
+    }
+  }
+
+  for (const range of KIND_RANGES) {
+    const rangeNip = range.nip.replace(/^NIP-/, '').replace(/^0+/, '').toUpperCase();
+    if (rangeNip === normalizedNip) {
+      for (let i = range.min; i <= range.max; i++) {
+        if (!kinds.includes(i)) {
+          kinds.push(i);
+        }
+      }
+    }
+  }
+
+  return kinds.sort((a, b) => a - b);
 }
 
 export function getKindInfo(kind: number): KindInfo {

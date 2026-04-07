@@ -1,5 +1,7 @@
 # Nostr Events Monitor
 
+[https://catrya.github.io/Nostr-Events-Monitor](https://catrya.github.io/Nostr-Events-Monitor/)
+
 A real-time Nostr events monitoring. Monitor and filter events from any Nostr relay.  
 Built with [MKStack](https://soapbox.pub/mkstack) - React + Nostr development framework
 
@@ -50,10 +52,11 @@ npm run dev
 
 ### Example Relay URLs
 
+- `wss://relay.mostro.network`
 - `wss://relay.damus.io`
 - `wss://relay.nostr.band`
 - `wss://relay.primal.net`
-- `wss://relay.mostro.network`
+
 
 ## 🤝 Contributing
 

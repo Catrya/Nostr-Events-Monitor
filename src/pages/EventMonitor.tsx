@@ -395,7 +395,7 @@ export function EventMonitor() {
               setStreamPhase('historical');
             }
           } else if (msg[0] === 'CLOSED') {
-            console.log(`Subscription closed by ${relayUrl}:`, (msg as NostrRelayEOSE)[1]);
+            console.log(`Subscription closed by ${relayUrl}:`, msg[1]);
             break;
           }
         }

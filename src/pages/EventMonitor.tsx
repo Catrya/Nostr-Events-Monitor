@@ -334,6 +334,12 @@ export function EventMonitor() {
         flushTimer = null;
         const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
         const capped = sorted.slice(0, MAX_STREAM_EVENTS);
+        if (eventsMap.size > MAX_STREAM_EVENTS) {
+          eventsMap.clear();
+          for (const event of capped) {
+            eventsMap.set(event.id, event);
+          }
+        }
         setStreamEvents(capped);
         setLastDisplayedEvents(capped);
 

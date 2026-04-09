@@ -185,7 +185,7 @@ export function EventMonitor() {
   }, [validRelays.length, nipMessage]);
 
   // Query for limited events from multiple relays
-  const { data: events, isLoading, refetch } = useQuery({
+  const { isLoading, refetch } = useQuery({
     queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags, nipKinds],
     queryFn: async (c) => {
       if (validRelays.length === 0) return [];
@@ -321,6 +321,7 @@ export function EventMonitor() {
 
     // Shared mutable state for collecting events across relays
     const eventsMap = new Map<string, EventWithRelay>();
+    const maxEvents = queryFilters.limit || MAX_STREAM_EVENTS;
 
     const eoseReceived = new Set<string>();
     let allEoseReceived = false;
@@ -333,8 +334,8 @@ export function EventMonitor() {
       flushTimer = setTimeout(() => {
         flushTimer = null;
         const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
-        const capped = sorted.slice(0, MAX_STREAM_EVENTS);
-        if (eventsMap.size > MAX_STREAM_EVENTS) {
+        const capped = sorted.slice(0, maxEvents);
+        if (eventsMap.size > maxEvents) {
           eventsMap.clear();
           for (const event of capped) {
             eventsMap.set(event.id, event);
@@ -454,9 +455,8 @@ export function EventMonitor() {
       }
       return streamEvents;
     }
-    // Show query results if available, otherwise last displayed
-    return events || lastDisplayedEvents;
-  }, [isStreaming, streamEvents, events, lastDisplayedEvents]);
+    return lastDisplayedEvents;
+  }, [isStreaming, streamEvents, lastDisplayedEvents]);
   
   // Count active filters
   const activeFilters = useMemo(() => {
@@ -706,7 +706,7 @@ export function EventMonitor() {
                 {/* Limit */}
                 <div className="space-y-1">
                   <ClickTooltip
-                    content="Maximum number of events to return per relay."
+                    content="Maximum number of events to display. Default: 50 (Search) / 500 (Stream)."
                     showOnLabelClick={true}
                   >
                     <Label htmlFor="limit" className="text-xs font-medium">Limit</Label>
@@ -1059,7 +1059,7 @@ export function EventMonitor() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">
                 Events {isStreaming
-                  ? `(${displayEvents.length}${displayEvents.length >= MAX_STREAM_EVENTS ? ' -- cap reached' : ''})`
+                  ? `(${displayEvents.length}${displayEvents.length >= (queryFilters.limit || MAX_STREAM_EVENTS) ? ' -- cap reached' : ''})`
                   : `(${displayEvents.length})`}
                 {isStreaming && (
                   <span className="text-sm font-normal text-muted-foreground ml-2">

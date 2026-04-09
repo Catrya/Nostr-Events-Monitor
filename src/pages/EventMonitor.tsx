@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NostrEvent, NRelay1, NostrFilter } from '@nostrify/nostrify';
+import { NostrEvent, NRelay1, NostrFilter, NostrRelayEVENT, NostrRelayEOSE } from '@nostrify/nostrify';
 import { nip19 } from 'nostr-tools';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,25 @@ interface EventFilters {
 }
 
 interface EventWithRelay extends NostrEvent {
-  relayUrl?: string;
+  relayUrls: string[];
+}
+
+const MAX_STREAM_EVENTS = 500;
+
+/** Merge events from multiple relays, deduplicating by event id and collecting relay URLs. */
+function deduplicateEvents(events: { event: NostrEvent; relayUrl: string }[]): EventWithRelay[] {
+  const map = new Map<string, EventWithRelay>();
+  for (const { event, relayUrl } of events) {
+    const existing = map.get(event.id);
+    if (existing) {
+      if (!existing.relayUrls.includes(relayUrl)) {
+        existing.relayUrls.push(relayUrl);
+      }
+    } else {
+      map.set(event.id, { ...event, relayUrls: [relayUrl] });
+    }
+  }
+  return Array.from(map.values());
 }
 
 // Helper function to decode npub to hex pubkey
@@ -88,6 +106,7 @@ export function EventMonitor() {
     tags: ['']
   });
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamPhase, setStreamPhase] = useState<'connecting' | 'historical' | 'live'>('connecting');
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -226,11 +245,7 @@ export function EventMonitor() {
           const events = await relay.query([qf], { signal });
           console.log(`Query result from ${relayUrl}:`, events.length, 'events');
 
-          // Mark each event with its relay
-          return events.map(event => ({
-            ...event,
-            relayUrl
-          }));
+          return events.map(event => ({ event, relayUrl }));
         } catch (error) {
           console.error(`Query failed for ${relayUrl}:`, error);
           return [];
@@ -241,9 +256,10 @@ export function EventMonitor() {
 
       try {
         const allResults = await Promise.all(relayPromises);
-        const allEvents = allResults.flat();
+        const allTagged = allResults.flat();
 
-        console.log('Total events from all relays:', allEvents.length);
+        const allEvents = deduplicateEvents(allTagged);
+        console.log('Total unique events from all relays:', allEvents.length);
         if (allEvents.length > 0) {
           const kinds = [...new Set(allEvents.map(e => e.kind))];
           console.log('Event kinds found:', kinds);
@@ -276,7 +292,7 @@ export function EventMonitor() {
     gcTime: 5 * 60 * 1000,
   });
 
-  // Handle streaming with optimized dependencies
+  // Handle real-time streaming with req() subscriptions
   useEffect(() => {
     if (!isStreaming || validRelays.length === 0) return;
 
@@ -288,6 +304,7 @@ export function EventMonitor() {
     if (currentFiltersString !== previousFiltersString || relaysChanged) {
       setStreamEvents([]);
       setLastDisplayedEvents([]);
+
       previousFiltersRef.current = { ...queryFilters };
       previousRelaysRef.current = [...validRelays];
     }
@@ -296,48 +313,36 @@ export function EventMonitor() {
     const relays = validRelays.map(url => new NRelay1(url));
     relayRef.current = relays;
 
-    // Start streaming from all relays
     const controller = new AbortController();
+    setStreamPhase('connecting');
+    setError(null);
 
-    console.log('Starting stream with filters:', queryFilters);
+    console.log('Starting real-time stream with filters:', queryFilters);
     console.log('Streaming from relays:', validRelays);
 
-    // Query all relays in parallel
-    const streamPromises = validRelays.map(async (relayUrl, index) => {
-      const relay = relays[index];
-      try {
-        const events = await relay.query([queryFilters], { signal: controller.signal });
-        console.log(`Stream result from ${relayUrl}:`, events.length, 'events');
+    // Shared mutable state for collecting events across relays
+    const eventsMap = new Map<string, EventWithRelay>();
 
-        // Mark each event with its relay
-        return events.map(event => ({
-          ...event,
-          relayUrl
-        }));
-      } catch (error) {
-        if (!controller.signal.aborted) {
-          console.error(`Streaming error from ${relayUrl}:`, error);
-        }
-        return [];
-      }
-    });
+    const eoseReceived = new Set<string>();
+    let allEoseReceived = false;
+    let nipKindsPopulated = false;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
-    Promise.all(streamPromises)
-      .then(allResults => {
-        const allEvents = allResults.flat();
-        console.log('Total stream events from all relays:', allEvents.length);
-        if (allEvents.length > 0) {
-          const kinds = [...new Set(allEvents.map(e => e.kind))];
-          console.log('Stream event kinds found:', kinds);
-        }
-        const sortedEvents = allEvents.sort((a, b) => b.created_at - a.created_at);
-        setStreamEvents(sortedEvents);
-        setLastDisplayedEvents(sortedEvents);
-        setError(null);
+    // Flush events to React state (throttled)
+    const flushEvents = () => {
+      if (flushTimer) return; // already scheduled
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
+        const capped = sorted.slice(0, MAX_STREAM_EVENTS);
+        setStreamEvents(capped);
+        setLastDisplayedEvents(capped);
 
-        // If NIP filter is active, populate kinds with found event kinds
-        if (nipActiveRef.current && allEvents.length > 0) {
-          const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
+
+        // Populate NIP kinds once after first EOSE
+        if (!nipKindsPopulated && nipActiveRef.current && capped.length > 0) {
+          nipKindsPopulated = true;
+          const foundKinds = [...new Set(capped.map(e => e.kind))].sort((a, b) => a - b);
           const foundKindsStr = foundKinds.map(String);
           setFilters(prev => {
             const current = prev.kinds.filter(k => k.trim() !== '').sort();
@@ -347,16 +352,70 @@ export function EventMonitor() {
             return { ...prev, kinds: foundKindsStr };
           });
         }
-      })
-      .catch(error => {
-        if (!controller.signal.aborted) {
-          console.error('Streaming error:', error);
-          setError(`Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }, 150); // batch updates every 150ms
+    };
+
+    const addEvent = (event: NostrEvent, relayUrl: string) => {
+
+      const existing = eventsMap.get(event.id);
+      if (existing) {
+        if (!existing.relayUrls.includes(relayUrl)) {
+          existing.relayUrls.push(relayUrl);
         }
-      });
+      } else {
+        eventsMap.set(event.id, { ...event, relayUrls: [relayUrl] });
+      }
+    };
+
+    // Subscribe to each relay using req()
+    const relayLoops = validRelays.map(async (relayUrl, index) => {
+      const relay = relays[index];
+      try {
+        const sub = relay.req([queryFilters], { signal: controller.signal });
+        for await (const msg of sub) {
+          if (controller.signal.aborted) break;
+
+          if (msg[0] === 'EVENT') {
+            const event = (msg as NostrRelayEVENT)[2];
+            addEvent(event, relayUrl);
+            // During historical phase, flush less aggressively (wait for EOSE)
+            if (allEoseReceived) {
+              flushEvents();
+            }
+          } else if (msg[0] === 'EOSE') {
+            console.log(`EOSE from ${relayUrl}`);
+            eoseReceived.add(relayUrl);
+            if (eoseReceived.size >= validRelays.length) {
+              allEoseReceived = true;
+              setStreamPhase('live');
+              // Flush all historical events at once
+              if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+              flushEvents();
+            } else {
+              setStreamPhase('historical');
+            }
+          } else if (msg[0] === 'CLOSED') {
+            console.log(`Subscription closed by ${relayUrl}:`, (msg as NostrRelayEOSE)[1]);
+            break;
+          }
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          console.error(`Streaming error from ${relayUrl}:`, error);
+        }
+      }
+    });
+
+    // Handle complete failure of all relays
+    Promise.all(relayLoops).then(() => {
+      if (!controller.signal.aborted && eventsMap.size === 0) {
+        setError('All relay connections closed without receiving events.');
+      }
+    });
 
     return () => {
       controller.abort();
+      if (flushTimer) clearTimeout(flushTimer);
       relays.forEach(relay => relay.close());
       relayRef.current = [];
     };
@@ -419,9 +478,9 @@ export function EventMonitor() {
   const relayStats = useMemo(() => {
     const stats = new Map<string, number>();
     displayEvents.forEach(event => {
-      if (event.relayUrl) {
-        const count = stats.get(event.relayUrl) || 0;
-        stats.set(event.relayUrl, count + 1);
+      for (const url of event.relayUrls) {
+        const count = stats.get(url) || 0;
+        stats.set(url, count + 1);
       }
     });
     return stats;
@@ -982,10 +1041,19 @@ export function EventMonitor() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">
-                Events {isStreaming ? '(Live Stream)' : `(${displayEvents.length})`}
+                Events {isStreaming
+                  ? `(${displayEvents.length}${displayEvents.length >= MAX_STREAM_EVENTS ? ' -- cap reached' : ''})`
+                  : `(${displayEvents.length})`}
+                {isStreaming && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    {streamPhase === 'connecting' && '-- Connecting...'}
+                    {streamPhase === 'historical' && '-- Loading stored events...'}
+                    {streamPhase === 'live' && '-- Live'}
+                  </span>
+                )}
                 {activeFilters > 0 && (
                   <span className="text-sm font-normal text-muted-foreground ml-2">
-                    • {activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
+                    {isStreaming ? '| ' : '-- '}{activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
                   </span>
                 )}
               </h2>
@@ -1039,7 +1107,9 @@ export function EventMonitor() {
                 <div className="flex items-center justify-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
                   <p className="text-foreground font-medium">
-                    {isStreaming ? 'Searching for events...' : 'Loading...'}
+                    {isStreaming
+                      ? streamPhase === 'connecting' ? 'Connecting to relays...' : 'Loading stored events...'
+                      : 'Loading...'}
                   </p>
                 </div>
                 {validRelays.length > 0 && (
@@ -1093,13 +1163,18 @@ export function EventMonitor() {
 
           {displayEvents.map((event, index) => (
             <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
-              {event.relayUrl && (
-                <Badge
-                  variant="secondary"
-                  className="absolute top-2 left-2 z-10 text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
-                >
-                  {event.relayUrl.replace('wss://', '').replace('ws://', '')}
-                </Badge>
+              {event.relayUrls.length > 0 && (
+                <div className="absolute top-2 left-2 z-10 flex flex-wrap gap-1">
+                  {event.relayUrls.map((url) => (
+                    <Badge
+                      key={url}
+                      variant="secondary"
+                      className="text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
+                    >
+                      {url.replace('wss://', '').replace('ws://', '')}
+                    </Badge>
+                  ))}
+                </div>
               )}
               <Button
                 variant="ghost"

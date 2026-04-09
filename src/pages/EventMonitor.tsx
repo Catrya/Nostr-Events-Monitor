@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NostrEvent, NRelay1, NostrFilter, NostrRelayEVENT, NostrRelayEOSE } from '@nostrify/nostrify';
+import { NostrEvent, NRelay1, NostrFilter, NostrRelayEVENT } from '@nostrify/nostrify';
 import { nip19 } from 'nostr-tools';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -161,11 +161,10 @@ export function EventMonitor() {
       }
     }
 
-    // Apply limit - for streaming use specified limit or default
     if (filters.limit) {
       qf.limit = parseInt(filters.limit);
     } else {
-      qf.limit = 50; // Default for streaming
+      qf.limit = 50;
     }
 
     return qf;
@@ -287,7 +286,7 @@ export function EventMonitor() {
         throw new Error(`Failed to connect to relays: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
-    enabled: validRelays.length > 0 && !!filters.limit,
+    enabled: false,
     staleTime: 30000,
     gcTime: 5 * 60 * 1000,
   });
@@ -421,46 +420,37 @@ export function EventMonitor() {
     };
   }, [isStreaming, validRelays, queryFilters]);
 
+  const handleSearch = useCallback(() => {
+    if (validRelays.length === 0) return;
+    setIsStreaming(false);
+    setError(null);
+    refetch();
+  }, [validRelays.length, refetch]);
+
+  const handleStream = useCallback(() => {
+    if (validRelays.length === 0) return;
+    setError(null);
+    setIsStreaming(false);
+    // Re-trigger the streaming effect
+    setTimeout(() => setIsStreaming(true), 0);
+  }, [validRelays.length]);
+
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (validRelays.length === 0) return;
-
-    setError(null);
-
-    if (filters.limit) {
-      setIsStreaming(false);
-      refetch();
-    } else {
-      setIsStreaming(true);
-    }
-  }, [validRelays.length, filters.limit, refetch]);
-
-
-  // Auto-start streaming when relays are provided and no limit is set
-  useEffect(() => {
-    if (validRelays.length > 0 && !filters.limit) {
-      setIsStreaming(true);
-    } else if (filters.limit) {
-      setIsStreaming(false);
-    }
-  }, [validRelays.length, filters.limit]);
+    handleSearch();
+  }, [handleSearch]);
 
 
   const displayEvents = useMemo(() => {
     if (isStreaming) {
-      // During streaming, if we have no stream events yet but have last displayed events,
-      // show the last displayed events to avoid showing 0 count
       if (streamEvents.length === 0 && lastDisplayedEvents.length > 0) {
         return lastDisplayedEvents;
       }
       return streamEvents;
     }
-    // When there's a limit specified, use query results, otherwise use last displayed
-    if (filters.limit) {
-      return events || [];
-    }
-    return lastDisplayedEvents;
-  }, [isStreaming, streamEvents, filters.limit, events, lastDisplayedEvents]);
+    // Show query results if available, otherwise last displayed
+    return events || lastDisplayedEvents;
+  }, [isStreaming, streamEvents, events, lastDisplayedEvents]);
   
   // Count active filters
   const activeFilters = useMemo(() => {
@@ -855,43 +845,66 @@ export function EventMonitor() {
                 </div>
               </div>
               
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={validRelays.length === 0 || isStreaming} className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50">
-                  {isStreaming ? 'Streaming...' : (filters.limit ? 'Fetch Events' : 'Start Stream')}
-                </Button>
-                {isStreaming && (
+              <div className="flex gap-3 pt-2 items-start">
+                <div className="flex flex-col items-center gap-0.5">
+                  <Button
+                    type="submit"
+                    disabled={validRelays.length === 0 || isLoading}
+                    className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
+                  >
+                    Search
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">Fetch once</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  {isStreaming ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsStreaming(false)}
+                      className="h-8 px-4 text-xs bg-destructive/10 border-destructive/30 hover:bg-destructive/20"
+                    >
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      disabled={validRelays.length === 0}
+                      onClick={handleStream}
+                      className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
+                    >
+                      Stream
+                    </Button>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{isStreaming ? 'Stop streaming' : 'Real-time'}</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsStreaming(false)}
-                    className="h-8 px-4 text-xs bg-destructive/10 border-destructive/30 hover:bg-destructive/20"
+                    onClick={() => {
+                      setIsStreaming(false);
+                      setFilters(prev => ({
+                        relays: prev.relays,
+                        kinds: [''],
+                        limit: '',
+                        authors: [''],
+                        since: '',
+                        until: '',
+                        tags: ['']
+                      }));
+                      nipActiveRef.current = false;
+                      setNipFilter(['']);
+                      setNipKinds([]);
+                      setNipMessage(null);
+                      setKindsExpanded(false);
+                    }}
+                    className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
                   >
-                    Stop Searching
+                    Clear Filters
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setFilters(prev => ({
-                      relays: prev.relays,
-                      kinds: [''],
-                      limit: '',
-                      authors: [''],
-                      since: '',
-                      until: '',
-                      tags: ['']
-                    }));
-                    nipActiveRef.current = false;
-                    setNipFilter(['']);
-                    setNipKinds([]);
-                    setNipMessage(null);
-                    setKindsExpanded(false);
-                  }}
-                  className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
-                >
-                  Clear Filters
-                </Button>
+                  <span className="text-[10px] text-muted-foreground">&nbsp;</span>
+                </div>
               </div>
 
               <div className="space-y-1 pt-2">
@@ -1011,12 +1024,10 @@ export function EventMonitor() {
                             setKindsExpanded(false);
                             setError(null);
 
-                            // Trigger query/streaming
-                            if (filters.limit) {
-                              setTimeout(() => refetch(), 0);
-                            } else if (validRelays.length > 0) {
+                            // Trigger a search
+                            if (validRelays.length > 0) {
                               setIsStreaming(false);
-                              setTimeout(() => setIsStreaming(true), 0);
+                              setTimeout(() => refetch(), 0);
                             }
                           }}
                           className="h-8 px-3 text-xs bg-accent/80 hover:bg-accent border-accent/50"

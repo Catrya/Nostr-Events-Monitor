@@ -162,9 +162,7 @@ export function EventMonitor() {
     }
 
     if (filters.limit) {
-      qf.limit = parseInt(filters.limit);
-    } else {
-      qf.limit = 50;
+      qf.limit = parseInt(filters.limit, 10);
     }
 
     return qf;
@@ -321,7 +319,8 @@ export function EventMonitor() {
 
     // Shared mutable state for collecting events across relays
     const eventsMap = new Map<string, EventWithRelay>();
-    const maxEvents = queryFilters.limit || MAX_STREAM_EVENTS;
+    const maxEvents = filters.limit ? parseInt(filters.limit, 10) : MAX_STREAM_EVENTS;
+    const streamFilters: NostrFilter = { ...queryFilters, limit: maxEvents };
 
     const eoseReceived = new Set<string>();
     let allEoseReceived = false;
@@ -377,7 +376,7 @@ export function EventMonitor() {
     const relayLoops = validRelays.map(async (relayUrl, index) => {
       const relay = relays[index];
       try {
-        const sub = relay.req([queryFilters], { signal: controller.signal });
+        const sub = relay.req([streamFilters], { signal: controller.signal });
         for await (const msg of sub) {
           if (controller.signal.aborted) break;
 
@@ -402,12 +401,32 @@ export function EventMonitor() {
             }
           } else if (msg[0] === 'CLOSED') {
             console.log(`Subscription closed by ${relayUrl}:`, msg[2]);
+            // Treat as terminal — count toward historical phase completion
+            if (!eoseReceived.has(relayUrl)) {
+              eoseReceived.add(relayUrl);
+              if (eoseReceived.size >= validRelays.length) {
+                allEoseReceived = true;
+                setStreamPhase('live');
+                if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+              }
+              flushEvents();
+            }
             break;
           }
         }
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error(`Streaming error from ${relayUrl}:`, error);
+          // Treat as terminal — count toward historical phase completion
+          if (!eoseReceived.has(relayUrl)) {
+            eoseReceived.add(relayUrl);
+            if (eoseReceived.size >= validRelays.length) {
+              allEoseReceived = true;
+              setStreamPhase('live');
+              if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+            }
+            flushEvents();
+          }
         }
       }
     });
@@ -425,7 +444,7 @@ export function EventMonitor() {
       relays.forEach(relay => relay.close());
       relayRef.current = [];
     };
-  }, [isStreaming, validRelays, queryFilters]);
+  }, [isStreaming, validRelays, queryFilters, filters.limit]);
 
   const handleSearch = useCallback(() => {
     if (validRelays.length === 0) return;
@@ -1059,7 +1078,7 @@ export function EventMonitor() {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">
                 Events {isStreaming
-                  ? `(${displayEvents.length}${displayEvents.length >= (queryFilters.limit || MAX_STREAM_EVENTS) ? ' -- cap reached' : ''})`
+                  ? `(${displayEvents.length}${displayEvents.length >= (filters.limit ? parseInt(filters.limit, 10) : MAX_STREAM_EVENTS) ? ' -- cap reached' : ''})`
                   : `(${displayEvents.length})`}
                 {isStreaming && (
                   <span className="text-sm font-normal text-muted-foreground ml-2">

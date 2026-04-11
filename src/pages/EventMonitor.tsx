@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { NostrEvent, NRelay1, NostrFilter } from '@nostrify/nostrify';
+import { NostrEvent, NRelay1, NostrFilter, NostrRelayEVENT } from '@nostrify/nostrify';
 import { nip19 } from 'nostr-tools';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,25 @@ interface EventFilters {
 }
 
 interface EventWithRelay extends NostrEvent {
-  relayUrl?: string;
+  relayUrls: string[];
+}
+
+const MAX_STREAM_EVENTS = 500;
+
+/** Merge events from multiple relays, deduplicating by event id and collecting relay URLs. */
+function deduplicateEvents(events: { event: NostrEvent; relayUrl: string }[]): EventWithRelay[] {
+  const map = new Map<string, EventWithRelay>();
+  for (const { event, relayUrl } of events) {
+    const existing = map.get(event.id);
+    if (existing) {
+      if (!existing.relayUrls.includes(relayUrl)) {
+        existing.relayUrls.push(relayUrl);
+      }
+    } else {
+      map.set(event.id, { ...event, relayUrls: [relayUrl] });
+    }
+  }
+  return Array.from(map.values());
 }
 
 // Helper function to decode npub to hex pubkey
@@ -88,6 +106,7 @@ export function EventMonitor() {
     tags: ['']
   });
   const [isStreaming, setIsStreaming] = useState(false);
+  const [streamPhase, setStreamPhase] = useState<'connecting' | 'historical' | 'live'>('connecting');
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -142,11 +161,8 @@ export function EventMonitor() {
       }
     }
 
-    // Apply limit - for streaming use specified limit or default
     if (filters.limit) {
-      qf.limit = parseInt(filters.limit);
-    } else {
-      qf.limit = 50; // Default for streaming
+      qf.limit = parseInt(filters.limit, 10);
     }
 
     return qf;
@@ -167,7 +183,7 @@ export function EventMonitor() {
   }, [validRelays.length, nipMessage]);
 
   // Query for limited events from multiple relays
-  const { data: events, isLoading, refetch } = useQuery({
+  const { isLoading, refetch } = useQuery({
     queryKey: ['events', validRelays, filters.kinds, filters.limit, filters.authors, filters.since, filters.until, filters.tags, nipKinds],
     queryFn: async (c) => {
       if (validRelays.length === 0) return [];
@@ -226,11 +242,7 @@ export function EventMonitor() {
           const events = await relay.query([qf], { signal });
           console.log(`Query result from ${relayUrl}:`, events.length, 'events');
 
-          // Mark each event with its relay
-          return events.map(event => ({
-            ...event,
-            relayUrl
-          }));
+          return events.map(event => ({ event, relayUrl }));
         } catch (error) {
           console.error(`Query failed for ${relayUrl}:`, error);
           return [];
@@ -241,9 +253,10 @@ export function EventMonitor() {
 
       try {
         const allResults = await Promise.all(relayPromises);
-        const allEvents = allResults.flat();
+        const allTagged = allResults.flat();
 
-        console.log('Total events from all relays:', allEvents.length);
+        const allEvents = deduplicateEvents(allTagged);
+        console.log('Total unique events from all relays:', allEvents.length);
         if (allEvents.length > 0) {
           const kinds = [...new Set(allEvents.map(e => e.kind))];
           console.log('Event kinds found:', kinds);
@@ -271,12 +284,12 @@ export function EventMonitor() {
         throw new Error(`Failed to connect to relays: ${error instanceof Error ? error.message : 'Unknown error'}`);
       }
     },
-    enabled: validRelays.length > 0 && !!filters.limit,
+    enabled: false,
     staleTime: 30000,
     gcTime: 5 * 60 * 1000,
   });
 
-  // Handle streaming with optimized dependencies
+  // Handle real-time streaming with req() subscriptions
   useEffect(() => {
     if (!isStreaming || validRelays.length === 0) return;
 
@@ -288,6 +301,7 @@ export function EventMonitor() {
     if (currentFiltersString !== previousFiltersString || relaysChanged) {
       setStreamEvents([]);
       setLastDisplayedEvents([]);
+
       previousFiltersRef.current = { ...queryFilters };
       previousRelaysRef.current = [...validRelays];
     }
@@ -296,112 +310,177 @@ export function EventMonitor() {
     const relays = validRelays.map(url => new NRelay1(url));
     relayRef.current = relays;
 
-    // Start streaming from all relays
     const controller = new AbortController();
+    setStreamPhase('connecting');
+    setError(null);
 
-    console.log('Starting stream with filters:', queryFilters);
+    console.log('Starting real-time stream with filters:', queryFilters);
     console.log('Streaming from relays:', validRelays);
 
-    // Query all relays in parallel
-    const streamPromises = validRelays.map(async (relayUrl, index) => {
+    // Shared mutable state for collecting events across relays
+    const eventsMap = new Map<string, EventWithRelay>();
+    const maxEvents = filters.limit ? parseInt(filters.limit, 10) : MAX_STREAM_EVENTS;
+    const streamFilters: NostrFilter = { ...queryFilters, limit: maxEvents };
+
+    const eoseReceived = new Set<string>();
+    let allEoseReceived = false;
+    let nipKindsPopulated = false;
+    let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    // Synchronous flush — sorts eventsMap and pushes to React state
+    const flushNow = () => {
+      const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
+      const capped = sorted.slice(0, maxEvents);
+      if (eventsMap.size > maxEvents) {
+        eventsMap.clear();
+        for (const event of capped) {
+          eventsMap.set(event.id, event);
+        }
+      }
+      setStreamEvents(capped);
+      setLastDisplayedEvents(capped);
+
+      // Populate NIP kinds once after first EOSE
+      if (!nipKindsPopulated && nipActiveRef.current && capped.length > 0) {
+        nipKindsPopulated = true;
+        const foundKinds = [...new Set(capped.map(e => e.kind))].sort((a, b) => a - b);
+        const foundKindsStr = foundKinds.map(String);
+        setFilters(prev => {
+          const current = prev.kinds.filter(k => k.trim() !== '').sort();
+          if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+            return prev;
+          }
+          return { ...prev, kinds: foundKindsStr };
+        });
+      }
+    };
+
+    // Flush events to React state (throttled)
+    const flushEvents = () => {
+      if (flushTimer) return; // already scheduled
+      flushTimer = setTimeout(() => {
+        flushTimer = null;
+        flushNow();
+      }, 150); // batch updates every 150ms
+    };
+
+    const addEvent = (event: NostrEvent, relayUrl: string) => {
+
+      const existing = eventsMap.get(event.id);
+      if (existing) {
+        if (!existing.relayUrls.includes(relayUrl)) {
+          existing.relayUrls.push(relayUrl);
+        }
+      } else {
+        eventsMap.set(event.id, { ...event, relayUrls: [relayUrl] });
+      }
+    };
+
+    // Subscribe to each relay using req()
+    const relayLoops = validRelays.map(async (relayUrl, index) => {
       const relay = relays[index];
       try {
-        const events = await relay.query([queryFilters], { signal: controller.signal });
-        console.log(`Stream result from ${relayUrl}:`, events.length, 'events');
+        const sub = relay.req([streamFilters], { signal: controller.signal });
+        for await (const msg of sub) {
+          if (controller.signal.aborted) break;
 
-        // Mark each event with its relay
-        return events.map(event => ({
-          ...event,
-          relayUrl
-        }));
+          if (msg[0] === 'EVENT') {
+            const event = (msg as NostrRelayEVENT)[2];
+            addEvent(event, relayUrl);
+            // During historical phase, flush less aggressively (wait for EOSE)
+            if (allEoseReceived) {
+              flushEvents();
+            }
+          } else if (msg[0] === 'EOSE') {
+            console.log(`EOSE from ${relayUrl}`);
+            eoseReceived.add(relayUrl);
+            if (eoseReceived.size >= validRelays.length) {
+              allEoseReceived = true;
+              setStreamPhase('live');
+              // Flush all historical events at once
+              if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+              flushEvents();
+            } else {
+              setStreamPhase('historical');
+            }
+          } else if (msg[0] === 'CLOSED') {
+            console.log(`Subscription closed by ${relayUrl}:`, msg[2]);
+            // Treat as terminal — count toward historical phase completion
+            if (!eoseReceived.has(relayUrl)) {
+              eoseReceived.add(relayUrl);
+              if (eoseReceived.size >= validRelays.length) {
+                allEoseReceived = true;
+                setStreamPhase('live');
+                if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+              }
+              flushEvents();
+            }
+            break;
+          }
+        }
       } catch (error) {
         if (!controller.signal.aborted) {
           console.error(`Streaming error from ${relayUrl}:`, error);
+          // Treat as terminal — count toward historical phase completion
+          if (!eoseReceived.has(relayUrl)) {
+            eoseReceived.add(relayUrl);
+            if (eoseReceived.size >= validRelays.length) {
+              allEoseReceived = true;
+              setStreamPhase('live');
+              if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+            }
+            flushEvents();
+          }
         }
-        return [];
       }
     });
 
-    Promise.all(streamPromises)
-      .then(allResults => {
-        const allEvents = allResults.flat();
-        console.log('Total stream events from all relays:', allEvents.length);
-        if (allEvents.length > 0) {
-          const kinds = [...new Set(allEvents.map(e => e.kind))];
-          console.log('Stream event kinds found:', kinds);
-        }
-        const sortedEvents = allEvents.sort((a, b) => b.created_at - a.created_at);
-        setStreamEvents(sortedEvents);
-        setLastDisplayedEvents(sortedEvents);
-        setError(null);
-
-        // If NIP filter is active, populate kinds with found event kinds
-        if (nipActiveRef.current && allEvents.length > 0) {
-          const foundKinds = [...new Set(allEvents.map(e => e.kind))].sort((a, b) => a - b);
-          const foundKindsStr = foundKinds.map(String);
-          setFilters(prev => {
-            const current = prev.kinds.filter(k => k.trim() !== '').sort();
-            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
-              return prev;
-            }
-            return { ...prev, kinds: foundKindsStr };
-          });
-        }
-      })
-      .catch(error => {
-        if (!controller.signal.aborted) {
-          console.error('Streaming error:', error);
-          setError(`Streaming failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        }
-      });
+    // Handle complete failure of all relays
+    Promise.all(relayLoops).then(() => {
+      if (!controller.signal.aborted && eventsMap.size === 0) {
+        setError('All relay connections closed without receiving events.');
+      }
+    });
 
     return () => {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      if (eventsMap.size > 0) flushNow();
       controller.abort();
       relays.forEach(relay => relay.close());
       relayRef.current = [];
     };
-  }, [isStreaming, validRelays, queryFilters]);
+  }, [isStreaming, validRelays, queryFilters, filters.limit]);
+
+  const handleSearch = useCallback(() => {
+    if (validRelays.length === 0) return;
+    setIsStreaming(false);
+    setError(null);
+    refetch();
+  }, [validRelays.length, refetch]);
+
+  const handleStream = useCallback(() => {
+    if (validRelays.length === 0) return;
+    setError(null);
+    setIsStreaming(false);
+    // Re-trigger the streaming effect
+    setTimeout(() => setIsStreaming(true), 0);
+  }, [validRelays.length]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    if (validRelays.length === 0) return;
-
-    setError(null);
-
-    if (filters.limit) {
-      setIsStreaming(false);
-      refetch();
-    } else {
-      setIsStreaming(true);
-    }
-  }, [validRelays.length, filters.limit, refetch]);
-
-
-  // Auto-start streaming when relays are provided and no limit is set
-  useEffect(() => {
-    if (validRelays.length > 0 && !filters.limit) {
-      setIsStreaming(true);
-    } else if (filters.limit) {
-      setIsStreaming(false);
-    }
-  }, [validRelays.length, filters.limit]);
+    handleSearch();
+  }, [handleSearch]);
 
 
   const displayEvents = useMemo(() => {
     if (isStreaming) {
-      // During streaming, if we have no stream events yet but have last displayed events,
-      // show the last displayed events to avoid showing 0 count
       if (streamEvents.length === 0 && lastDisplayedEvents.length > 0) {
         return lastDisplayedEvents;
       }
       return streamEvents;
     }
-    // When there's a limit specified, use query results, otherwise use last displayed
-    if (filters.limit) {
-      return events || [];
-    }
     return lastDisplayedEvents;
-  }, [isStreaming, streamEvents, filters.limit, events, lastDisplayedEvents]);
+  }, [isStreaming, streamEvents, lastDisplayedEvents]);
   
   // Count active filters
   const activeFilters = useMemo(() => {
@@ -419,9 +498,9 @@ export function EventMonitor() {
   const relayStats = useMemo(() => {
     const stats = new Map<string, number>();
     displayEvents.forEach(event => {
-      if (event.relayUrl) {
-        const count = stats.get(event.relayUrl) || 0;
-        stats.set(event.relayUrl, count + 1);
+      for (const url of event.relayUrls) {
+        const count = stats.get(url) || 0;
+        stats.set(url, count + 1);
       }
     });
     return stats;
@@ -651,7 +730,7 @@ export function EventMonitor() {
                 {/* Limit */}
                 <div className="space-y-1">
                   <ClickTooltip
-                    content="Maximum number of events to return per relay."
+                    content="Maximum number of events to display. Default: 50 (Search) / 500 (Stream)."
                     showOnLabelClick={true}
                   >
                     <Label htmlFor="limit" className="text-xs font-medium">Limit</Label>
@@ -796,43 +875,66 @@ export function EventMonitor() {
                 </div>
               </div>
               
-              <div className="flex gap-2 pt-2">
-                <Button type="submit" disabled={validRelays.length === 0 || isStreaming} className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50">
-                  {isStreaming ? 'Streaming...' : (filters.limit ? 'Fetch Events' : 'Start Stream')}
-                </Button>
-                {isStreaming && (
+              <div className="flex gap-3 pt-2 items-start">
+                <div className="flex flex-col items-center gap-0.5">
+                  <Button
+                    type="submit"
+                    disabled={validRelays.length === 0 || isLoading}
+                    className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
+                  >
+                    Search
+                  </Button>
+                  <span className="text-[10px] text-muted-foreground">Fetch once</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  {isStreaming ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsStreaming(false)}
+                      className="h-8 px-4 text-xs bg-destructive/10 border-destructive/30 hover:bg-destructive/20"
+                    >
+                      Stop
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      disabled={validRelays.length === 0}
+                      onClick={handleStream}
+                      className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
+                    >
+                      Stream
+                    </Button>
+                  )}
+                  <span className="text-[10px] text-muted-foreground">{isStreaming ? 'Stop streaming' : 'Real-time'}</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setIsStreaming(false)}
-                    className="h-8 px-4 text-xs bg-destructive/10 border-destructive/30 hover:bg-destructive/20"
+                    onClick={() => {
+                      setIsStreaming(false);
+                      setFilters(prev => ({
+                        relays: prev.relays,
+                        kinds: [''],
+                        limit: '',
+                        authors: [''],
+                        since: '',
+                        until: '',
+                        tags: ['']
+                      }));
+                      nipActiveRef.current = false;
+                      setNipFilter(['']);
+                      setNipKinds([]);
+                      setNipMessage(null);
+                      setKindsExpanded(false);
+                    }}
+                    className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
                   >
-                    Stop Searching
+                    Clear Filters
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setFilters(prev => ({
-                      relays: prev.relays,
-                      kinds: [''],
-                      limit: '',
-                      authors: [''],
-                      since: '',
-                      until: '',
-                      tags: ['']
-                    }));
-                    nipActiveRef.current = false;
-                    setNipFilter(['']);
-                    setNipKinds([]);
-                    setNipMessage(null);
-                    setKindsExpanded(false);
-                  }}
-                  className="h-8 px-4 text-xs bg-accent/10 border-accent/30 hover:bg-accent/20"
-                >
-                  Clear Filters
-                </Button>
+                  <span className="text-[10px] text-muted-foreground">&nbsp;</span>
+                </div>
               </div>
 
               <div className="space-y-1 pt-2">
@@ -952,12 +1054,10 @@ export function EventMonitor() {
                             setKindsExpanded(false);
                             setError(null);
 
-                            // Trigger query/streaming
-                            if (filters.limit) {
-                              setTimeout(() => refetch(), 0);
-                            } else if (validRelays.length > 0) {
+                            // Trigger a search
+                            if (validRelays.length > 0) {
                               setIsStreaming(false);
-                              setTimeout(() => setIsStreaming(true), 0);
+                              setTimeout(() => refetch(), 0);
                             }
                           }}
                           className="h-8 px-3 text-xs bg-accent/80 hover:bg-accent border-accent/50"
@@ -982,10 +1082,19 @@ export function EventMonitor() {
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-foreground">
-                Events {isStreaming ? '(Live Stream)' : `(${displayEvents.length})`}
+                Events {isStreaming
+                  ? `(${displayEvents.length}${displayEvents.length >= (filters.limit ? parseInt(filters.limit, 10) : MAX_STREAM_EVENTS) ? ' -- cap reached' : ''})`
+                  : `(${displayEvents.length})`}
+                {isStreaming && (
+                  <span className="text-sm font-normal text-muted-foreground ml-2">
+                    {streamPhase === 'connecting' && '-- Connecting...'}
+                    {streamPhase === 'historical' && '-- Loading stored events...'}
+                    {streamPhase === 'live' && '-- Live'}
+                  </span>
+                )}
                 {activeFilters > 0 && (
                   <span className="text-sm font-normal text-muted-foreground ml-2">
-                    • {activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
+                    {isStreaming ? '| ' : '-- '}{activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
                   </span>
                 )}
               </h2>
@@ -1039,7 +1148,9 @@ export function EventMonitor() {
                 <div className="flex items-center justify-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
                   <p className="text-foreground font-medium">
-                    {isStreaming ? 'Searching for events...' : 'Loading...'}
+                    {isStreaming
+                      ? streamPhase === 'connecting' ? 'Connecting to relays...' : 'Loading stored events...'
+                      : 'Loading...'}
                   </p>
                 </div>
                 {validRelays.length > 0 && (
@@ -1093,28 +1204,35 @@ export function EventMonitor() {
 
           {displayEvents.map((event, index) => (
             <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
-              {event.relayUrl && (
-                <Badge
-                  variant="secondary"
-                  className="absolute top-2 left-2 z-10 text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
-                >
-                  {event.relayUrl.replace('wss://', '').replace('ws://', '')}
-                </Badge>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
-                className="absolute top-1 right-1 h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 z-10 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm"
-                aria-label="Copy event to clipboard"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
+              <div className="flex items-start justify-between p-4 pb-0">
+                {event.relayUrls.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {event.relayUrls.map((url) => (
+                      <Badge
+                        key={url}
+                        variant="secondary"
+                        className="text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
+                      >
+                        {url.replace('wss://', '').replace('ws://', '')}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
-              </Button>
-              <CardContent className="p-4 pt-10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
+                  className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm shrink-0"
+                  aria-label="Copy event to clipboard"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <CardContent className="p-4 pt-2">
                 <JsonViewer data={event} />
               </CardContent>
             </Card>

@@ -327,36 +327,40 @@ export function EventMonitor() {
     let nipKindsPopulated = false;
     let flushTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // Synchronous flush — sorts eventsMap and pushes to React state
+    const flushNow = () => {
+      const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
+      const capped = sorted.slice(0, maxEvents);
+      if (eventsMap.size > maxEvents) {
+        eventsMap.clear();
+        for (const event of capped) {
+          eventsMap.set(event.id, event);
+        }
+      }
+      setStreamEvents(capped);
+      setLastDisplayedEvents(capped);
+
+      // Populate NIP kinds once after first EOSE
+      if (!nipKindsPopulated && nipActiveRef.current && capped.length > 0) {
+        nipKindsPopulated = true;
+        const foundKinds = [...new Set(capped.map(e => e.kind))].sort((a, b) => a - b);
+        const foundKindsStr = foundKinds.map(String);
+        setFilters(prev => {
+          const current = prev.kinds.filter(k => k.trim() !== '').sort();
+          if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
+            return prev;
+          }
+          return { ...prev, kinds: foundKindsStr };
+        });
+      }
+    };
+
     // Flush events to React state (throttled)
     const flushEvents = () => {
       if (flushTimer) return; // already scheduled
       flushTimer = setTimeout(() => {
         flushTimer = null;
-        const sorted = Array.from(eventsMap.values()).sort((a, b) => b.created_at - a.created_at);
-        const capped = sorted.slice(0, maxEvents);
-        if (eventsMap.size > maxEvents) {
-          eventsMap.clear();
-          for (const event of capped) {
-            eventsMap.set(event.id, event);
-          }
-        }
-        setStreamEvents(capped);
-        setLastDisplayedEvents(capped);
-
-
-        // Populate NIP kinds once after first EOSE
-        if (!nipKindsPopulated && nipActiveRef.current && capped.length > 0) {
-          nipKindsPopulated = true;
-          const foundKinds = [...new Set(capped.map(e => e.kind))].sort((a, b) => a - b);
-          const foundKindsStr = foundKinds.map(String);
-          setFilters(prev => {
-            const current = prev.kinds.filter(k => k.trim() !== '').sort();
-            if (current.length === foundKindsStr.length && current.every((v, i) => v === foundKindsStr[i])) {
-              return prev;
-            }
-            return { ...prev, kinds: foundKindsStr };
-          });
-        }
+        flushNow();
       }, 150); // batch updates every 150ms
     };
 
@@ -439,8 +443,9 @@ export function EventMonitor() {
     });
 
     return () => {
+      if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+      if (eventsMap.size > 0) flushNow();
       controller.abort();
-      if (flushTimer) clearTimeout(flushTimer);
       relays.forEach(relay => relay.close());
       relayRef.current = [];
     };
@@ -1199,33 +1204,35 @@ export function EventMonitor() {
 
           {displayEvents.map((event, index) => (
             <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
-              {event.relayUrls.length > 0 && (
-                <div className="absolute top-2 left-2 z-10 flex flex-wrap gap-1">
-                  {event.relayUrls.map((url) => (
-                    <Badge
-                      key={url}
-                      variant="secondary"
-                      className="text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
-                    >
-                      {url.replace('wss://', '').replace('ws://', '')}
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
-                className="absolute top-1 right-1 h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 z-10 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm"
-                aria-label="Copy event to clipboard"
-              >
-                {isCopied ? (
-                  <Check className="h-4 w-4 text-green-500" />
-                ) : (
-                  <Copy className="h-4 w-4" />
+              <div className="flex items-start justify-between p-4 pb-0">
+                {event.relayUrls.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {event.relayUrls.map((url) => (
+                      <Badge
+                        key={url}
+                        variant="secondary"
+                        className="text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
+                      >
+                        {url.replace('wss://', '').replace('ws://', '')}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
-              </Button>
-              <CardContent className="p-4 pt-10">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
+                  className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm shrink-0"
+                  aria-label="Copy event to clipboard"
+                >
+                  {isCopied ? (
+                    <Check className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <Copy className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+              <CardContent className="p-4 pt-2">
                 <JsonViewer data={event} />
               </CardContent>
             </Card>

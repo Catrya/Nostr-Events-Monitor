@@ -3,7 +3,7 @@
 [https://catrya.github.io/Nostr-Events-Monitor](https://catrya.github.io/Nostr-Events-Monitor/)
 
 A real-time Nostr events monitoring. Monitor and filter events from any Nostr relay.  
-Built with [MKStack](https://soapbox.pub/mkstack) - React + Nostr development framework
+Bootstrapped with [MKStack](https://soapbox.pub/mkstack), developed with [Claude Code](https://claude.ai/code)
 
 
 ## 🛠️ Tech Stack

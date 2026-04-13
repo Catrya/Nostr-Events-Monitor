@@ -110,6 +110,7 @@ export function EventMonitor() {
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [noRelayHint, setNoRelayHint] = useState<'search' | 'stream' | null>(null);
   const [nipFilter, setNipFilter] = useState<string[]>(['']);
   const [nipKinds, setNipKinds] = useState<number[]>([]);
   const [nipMessage, setNipMessage] = useState<string | null>(null);
@@ -181,6 +182,11 @@ export function EventMonitor() {
       setNipMessage(null);
     }
   }, [validRelays.length, nipMessage]);
+
+  // Clear no-relay hint once a relay is added
+  useEffect(() => {
+    if (validRelays.length > 0) setNoRelayHint(null);
+  }, [validRelays.length]);
 
   // Query for limited events from multiple relays
   const { isLoading, refetch } = useQuery({
@@ -452,14 +458,22 @@ export function EventMonitor() {
   }, [isStreaming, validRelays, queryFilters, filters.limit]);
 
   const handleSearch = useCallback(() => {
-    if (validRelays.length === 0) return;
+    if (validRelays.length === 0) {
+      setNoRelayHint('search');
+      return;
+    }
+    setNoRelayHint(null);
     setIsStreaming(false);
     setError(null);
     refetch();
   }, [validRelays.length, refetch]);
 
   const handleStream = useCallback(() => {
-    if (validRelays.length === 0) return;
+    if (validRelays.length === 0) {
+      setNoRelayHint('stream');
+      return;
+    }
+    setNoRelayHint(null);
     setError(null);
     setIsStreaming(false);
     // Re-trigger the streaming effect
@@ -879,12 +893,14 @@ export function EventMonitor() {
                 <div className="flex flex-col items-center gap-0.5">
                   <Button
                     type="submit"
-                    disabled={validRelays.length === 0 || isLoading}
+                    disabled={isLoading}
                     className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
                   >
                     Search
                   </Button>
-                  <span className="text-[10px] text-muted-foreground">Fetch once</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {noRelayHint === 'search' ? 'Enter a relay first' : 'Fetch once'}
+                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   {isStreaming ? (
@@ -899,14 +915,15 @@ export function EventMonitor() {
                   ) : (
                     <Button
                       type="button"
-                      disabled={validRelays.length === 0}
                       onClick={handleStream}
                       className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50"
                     >
                       Stream
                     </Button>
                   )}
-                  <span className="text-[10px] text-muted-foreground">{isStreaming ? 'Stop streaming' : 'Real-time'}</span>
+                  <span className="text-[10px] text-muted-foreground">
+                    {noRelayHint === 'stream' ? 'Enter a relay first' : isStreaming ? 'Stop streaming' : 'Real-time'}
+                  </span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5">
                   <Button
@@ -1242,22 +1259,13 @@ export function EventMonitor() {
         <div className="text-center py-8 text-sm text-muted-foreground space-y-3">
           <p>
             Vibed by{" "}
-            <a 
-              href="https://github.com/Catrya" 
-              target="_blank" 
+            <a
+              href="https://github.com/Catrya"
+              target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
             >
               Catrya
-            </a>
-            {" "}with{" "}
-            <a 
-              href="https://soapbox.pub/mkstack" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              className="text-primary hover:underline"
-            >
-              MKStack
             </a>
           </p>
           <a 

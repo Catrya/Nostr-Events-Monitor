@@ -525,6 +525,14 @@ export function EventMonitor() {
     else handleStream();
   }, [mode, handleSearch, handleStream]);
 
+  const handleModeChange = useCallback((newMode: 'search' | 'stream') => {
+    setMode((prev) => {
+      if (prev === newMode) return prev;
+      if (isStreaming) setIsStreaming(false);
+      return newMode;
+    });
+  }, [isStreaming]);
+
   const displayEvents = useMemo(() => {
     if (isStreaming) {
       if (streamEvents.length === 0 && lastDisplayedEvents.length > 0) {
@@ -625,15 +633,13 @@ export function EventMonitor() {
                 streaming{streamPhase === 'live' ? ` · ${eventRate}/s` : streamPhase === 'connecting' ? ' · connecting' : ' · loading'}
               </span>
             )}
-            <span
+            <button
+              type="button"
               className="status-pill clickable"
               onClick={() => setWalkOpen(true)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setWalkOpen(true)}
             >
               <span>?</span> How it works
-            </span>
+            </button>
           </div>
         </div>
       </div>
@@ -650,7 +656,7 @@ export function EventMonitor() {
                     <button
                       type="button"
                       className={mode === 'search' ? 'on' : ''}
-                      onClick={() => setMode('search')}
+                      onClick={() => handleModeChange('search')}
                     >
                       <span className="seg-icon">◎</span>
                       Search
@@ -659,7 +665,7 @@ export function EventMonitor() {
                     <button
                       type="button"
                       className={mode === 'stream' ? 'on' : ''}
-                      onClick={() => setMode('stream')}
+                      onClick={() => handleModeChange('stream')}
                     >
                       <span className="seg-icon">⬢</span>
                       Stream

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export const WALK_STORAGE_KEY = 'nem-walk-seen';
 
@@ -45,6 +45,21 @@ export function Walkthrough({ onClose }: WalkthroughProps) {
   const [step, setStep] = useState(0);
   const s = steps[step];
   const isLast = step === steps.length - 1;
+  const primaryBtnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    primaryBtnRef.current?.focus();
+
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      previouslyFocused?.focus?.();
+    };
+  }, [onClose]);
 
   return (
     <div
@@ -73,6 +88,7 @@ export function Walkthrough({ onClose }: WalkthroughProps) {
               Skip
             </button>
             <button
+              ref={primaryBtnRef}
               type="button"
               onClick={() => (isLast ? onClose() : setStep(step + 1))}
               className="h-8 px-4 text-xs bg-accent/80 hover:bg-accent border-accent/50 rounded"

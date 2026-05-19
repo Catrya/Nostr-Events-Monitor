@@ -170,6 +170,8 @@
 .status-pill.clickable {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s;
+  appearance: none;
+  margin: 0;
 }
 .status-pill.clickable:hover {
   border-color: var(--c-accent);

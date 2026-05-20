@@ -658,18 +658,16 @@ export function EventMonitor() {
                       className={mode === 'search' ? 'on' : ''}
                       onClick={() => handleModeChange('search')}
                     >
-                      <span className="seg-icon">◎</span>
+                      <span className="seg-dot" />
                       Search
-                      <span className="seg-desc">fetch once</span>
                     </button>
                     <button
                       type="button"
                       className={mode === 'stream' ? 'on' : ''}
                       onClick={() => handleModeChange('stream')}
                     >
-                      <span className="seg-icon">⬢</span>
+                      <span className="seg-dot" />
                       Stream
-                      <span className="seg-desc">real-time</span>
                     </button>
                   </div>
                 </div>
@@ -682,6 +680,7 @@ export function EventMonitor() {
                       className={queryType === 'kind' ? 'on' : ''}
                       onClick={() => setQueryType('kind')}
                     >
+                      <span className="seg-dot" />
                       Kind
                     </button>
                     <button
@@ -689,6 +688,7 @@ export function EventMonitor() {
                       className={queryType === 'nip' ? 'on' : ''}
                       onClick={() => setQueryType('nip')}
                     >
+                      <span className="seg-dot" />
                       NIP
                     </button>
                   </div>

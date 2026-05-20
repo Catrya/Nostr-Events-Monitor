@@ -1347,7 +1347,7 @@ export function EventMonitor() {
           )}
 
           {displayEvents.map((event, index) => (
-            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 backdrop-blur-sm hover:border-accent/40 transition-all duration-200 relative">
+            <Card key={`${event.id}-${index}`} className="border-accent/20 bg-card/50 hover:border-accent/40 transition-colors duration-200 relative">
               <div className="flex items-start justify-between p-4 pb-0">
                 {event.relayUrls.length > 0 && (
                   <div className="flex flex-wrap gap-1">
@@ -1355,7 +1355,7 @@ export function EventMonitor() {
                       <Badge
                         key={url}
                         variant="secondary"
-                        className="text-xs bg-accent/20 border-accent/40 backdrop-blur-sm"
+                        className="text-xs bg-accent/20 border-accent/40"
                       >
                         {url.replace('wss://', '').replace('ws://', '')}
                       </Badge>
@@ -1366,7 +1366,7 @@ export function EventMonitor() {
                   variant="ghost"
                   size="sm"
                   onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
-                  className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-all duration-200 hover:scale-110 active:scale-95 bg-background/80 backdrop-blur-sm border border-border/50 rounded-full shadow-sm shrink-0"
+                  className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-opacity duration-200 bg-background/80 border border-border/50 rounded-full shadow-sm shrink-0"
                   aria-label="Copy event to clipboard"
                 >
                   {isCopied ? (

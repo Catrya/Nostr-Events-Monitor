@@ -1,6 +1,6 @@
 # Nostr Events Monitor
 
-[https://catrya.github.io/Nostr-Events-Monitor](https://catrya.github.io/Nostr-Events-Monitor/)
+[https://nostrinspect.com](https://nostrinspect.com/)
 
 A real-time Nostr events monitoring. Monitor and filter events from any Nostr relay.  
 

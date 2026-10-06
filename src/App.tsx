@@ -11,6 +11,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { NostrLoginProvider } from '@nostrify/react/login';
 import { AppProvider } from '@/components/AppProvider';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { AppConfig } from '@/contexts/AppContext';
 import AppRouter from './AppRouter';
 
@@ -53,9 +54,11 @@ export function App() {
                 <TooltipProvider>
                   <Toaster />
                   <Sonner />
-                  <Suspense>
-                    <AppRouter />
-                  </Suspense>
+                  <ErrorBoundary>
+                    <Suspense>
+                      <AppRouter />
+                    </Suspense>
+                  </ErrorBoundary>
                 </TooltipProvider>
               </NostrProvider>
             </NostrLoginProvider>

@@ -14,6 +14,7 @@ import { Copy, Check, Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
 import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
+import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
 
 interface EventFilters {
   relays: string[];
@@ -61,24 +62,6 @@ function decodeAuthor(author: string): string {
     }
   }
   return author;
-}
-
-function normalizeRelayUrl(url: string): string {
-  const trimmed = url.trim();
-  if (!trimmed) return trimmed;
-  if (trimmed.includes('://')) return trimmed;
-  return `wss://${trimmed}`;
-}
-
-function isValidWebSocketUrl(url: string): boolean {
-  if (!url || url.trim() === '') return false;
-  try {
-    const normalizedUrl = normalizeRelayUrl(url);
-    const urlObj = new URL(normalizedUrl);
-    return (urlObj.protocol === 'wss:' || urlObj.protocol === 'ws:') && urlObj.hostname !== '';
-  } catch {
-    return false;
-  }
 }
 
 export function EventMonitor() {

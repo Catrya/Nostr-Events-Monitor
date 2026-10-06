@@ -32,6 +32,8 @@ function CheckRow({ ok, label, detail }: { ok: boolean; label: string; detail: s
 const RELAY_STATUS: Record<RelayResult['status'], { label: string; icon: ReactNode }> = {
   pending: { label: 'searching…', icon: <LoaderCircle className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> },
   found: { label: 'has it', icon: <CircleCheck className="h-3.5 w-3.5 text-green-500" /> },
+  outdated: { label: 'older version', icon: <CircleMinus className="h-3.5 w-3.5 text-yellow-500" /> },
+  invalid: { label: 'invalid copy', icon: <CircleX className="h-3.5 w-3.5 text-destructive" /> },
   missing: { label: 'not found', icon: <CircleMinus className="h-3.5 w-3.5 text-muted-foreground" /> },
   error: { label: 'unreachable', icon: <CircleX className="h-3.5 w-3.5 text-destructive" /> },
 };

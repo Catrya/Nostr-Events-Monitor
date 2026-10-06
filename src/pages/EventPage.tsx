@@ -2,15 +2,18 @@ import { useMemo, type ReactNode } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
-import { ArrowLeft, Check, CircleCheck, CircleMinus, CircleX, Copy, LoaderCircle } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, CircleCheck, CircleMinus, CircleX, Copy, Info, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { JsonViewer } from '@/components/JsonViewer';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useEventById, type RelayResult } from '@/hooks/useEventById';
 import { getKindInfo } from '@/data/kindInfo';
 import { parseEventRef } from '@/lib/eventRef';
+import type { EventVerification } from '@/lib/verifyEvent';
+import { cn } from '@/lib/utils';
 
 function CheckRow({ ok, label, detail }: { ok: boolean; label: string; detail: string }) {
   return (
@@ -46,6 +49,37 @@ function RelayList({ relays }: { relays: RelayResult[] }) {
       ))}
     </ul>
   );
+}
+
+function Section({ icon, summary, summaryClassName, defaultOpen = false, children }: {
+  icon: ReactNode;
+  summary: string;
+  summaryClassName?: string;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Collapsible defaultOpen={defaultOpen} className="overflow-hidden first:rounded-t-lg last:rounded-b-lg">
+      <CollapsibleTrigger className="group flex w-full items-center gap-2 px-4 py-3 text-left text-sm hover:bg-accent/5 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-accent">
+        <span className="shrink-0">{icon}</span>
+        <span key={summary} className={cn('min-w-0 flex-1', summaryClassName)}>{summary}</span>
+        <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+      </CollapsibleTrigger>
+      <CollapsibleContent className="px-4 pb-4 pt-1">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
+/** Signature and id always; author and kind only when the link includes them. */
+function countChecks(v: EventVerification) {
+  const checks = [v.signatureValid, v.idValid, v.authorMatches, v.kindMatches].filter((c): c is boolean => c !== undefined);
+  return { passed: checks.filter(Boolean).length, total: checks.length };
+}
+
+function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
+  const found = relays.filter(r => r.status === 'found').length;
+  const foundText = `Found on ${found} relay${found !== 1 ? 's' : ''}`;
+  return isSearching ? `${foundText} · checking ${relays.length}…` : `${foundText} · ${relays.length} checked`;
 }
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
@@ -110,39 +144,52 @@ export function EventPage() {
     );
   } else {
     const kindInfo = getKindInfo(event.kind);
+    const { passed, total } = countChecks(verification!);
+    const allPassed = passed === total;
     body = (
       <>
-        <Card className="panel-corner border-accent/20 bg-card/50">
-          <CardContent className="p-4 grid gap-3 sm:grid-cols-2 text-sm">
-            <CheckRow
-              ok={verification!.signatureValid}
-              label={verification!.signatureValid ? 'Signature valid' : 'Signature invalid'}
-              detail="Checked in this browser against the author's public key."
-            />
-            <CheckRow
-              ok={verification!.idValid}
-              label={verification!.idValid ? 'Id matches content' : 'Id does not match content'}
-              detail="The id is the hash of the event, so the content was not altered."
-            />
-            {verification!.authorMatches !== undefined && (
+        <Card className="panel-corner border-accent/20 bg-card/50 divide-y divide-accent/10">
+          <Section
+            key={`${event.id}-${event.sig}`}
+            icon={allPassed
+              ? <CircleCheck className="h-4 w-4 text-green-500" />
+              : <CircleX className="h-4 w-4 text-destructive" />}
+            summary={`${allPassed ? 'Verified' : 'Verification failed'} · ${passed} of ${total} checks passed`}
+            summaryClassName={allPassed ? undefined : 'text-destructive'}
+            defaultOpen={!allPassed}
+          >
+            <div className="grid gap-3 sm:grid-cols-2 text-sm">
               <CheckRow
-                ok={verification!.authorMatches}
-                label={verification!.authorMatches ? 'Author matches link' : 'Author differs from link'}
-                detail="The link says who published the event."
+                ok={verification!.signatureValid}
+                label={verification!.signatureValid ? 'Signature valid' : 'Signature invalid'}
+                detail="Checked in this browser against the author's public key."
               />
-            )}
-            {verification!.kindMatches !== undefined && (
               <CheckRow
-                ok={verification!.kindMatches}
-                label={verification!.kindMatches ? 'Kind matches link' : 'Kind differs from link'}
-                detail="The link says which kind of event it is."
+                ok={verification!.idValid}
+                label={verification!.idValid ? 'Id matches content' : 'Id does not match content'}
+                detail="The id is the hash of the event, so the content was not altered."
               />
-            )}
-          </CardContent>
-        </Card>
+              {verification!.authorMatches !== undefined && (
+                <CheckRow
+                  ok={verification!.authorMatches}
+                  label={verification!.authorMatches ? 'Author matches link' : 'Author differs from link'}
+                  detail="The link says who published the event."
+                />
+              )}
+              {verification!.kindMatches !== undefined && (
+                <CheckRow
+                  ok={verification!.kindMatches}
+                  label={verification!.kindMatches ? 'Kind matches link' : 'Kind differs from link'}
+                  detail="The link says which kind of event it is."
+                />
+              )}
+            </div>
+          </Section>
 
-        <Card className="border-accent/20 bg-card/50">
-          <CardContent className="p-4">
+          <Section
+            icon={<Info className="h-4 w-4 text-muted-foreground" />}
+            summary={`Kind ${event.kind} · ${kindInfo.nip ? `${kindInfo.nip} ` : ''}${kindInfo.description}`}
+          >
             <dl className="grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[max-content_1fr]">
               <dt className="text-muted-foreground">Kind</dt>
               <dd>
@@ -163,13 +210,16 @@ export function EventPage() {
               <dt className="text-muted-foreground">Id</dt>
               <dd translate="no" className="font-mono text-xs break-all">{event.id}</dd>
             </dl>
-          </CardContent>
-        </Card>
+          </Section>
 
-        <Card className="border-accent/20 bg-card/50">
-          <CardContent className="p-4">
+          <Section
+            icon={isSearching
+              ? <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
+              : <CircleCheck className="h-4 w-4 text-green-500" />}
+            summary={relaysSummary(relays, isSearching)}
+          >
             <RelayList relays={relays} />
-          </CardContent>
+          </Section>
         </Card>
 
         <Card className="border-accent/20 bg-card/50 relative">

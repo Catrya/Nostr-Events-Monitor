@@ -52,4 +52,21 @@ describe('checkEvent', () => {
     expect(checkEvent(event, { author: other, kind: 7 })).toMatchObject({ authorMatches: false, kindMatches: false });
     expect(checkEvent(event, {})).not.toHaveProperty('authorMatches');
   });
+
+  it('compares the d tag with the reference', () => {
+    const sk = generateSecretKey();
+    const event = finalizeEvent({ kind: 38383, created_at: 1700000000, tags: [['d', 'order-1']], content: '' }, sk);
+    const noD = finalizeEvent({ kind: 10002, created_at: 1700000000, tags: [], content: '' }, sk);
+
+    expect(checkEvent(event, { identifier: 'order-1' }).identifierMatches).toBe(true);
+    expect(checkEvent(event, { identifier: 'order-2' }).identifierMatches).toBe(false);
+    expect(checkEvent(noD, { identifier: '' }).identifierMatches).toBe(true);
+    expect(checkEvent(event)).not.toHaveProperty('identifierMatches');
+  });
+
+  it('does not crash on malformed tags', () => {
+    const event = { ...signedEvent(), tags: 'not-an-array' } as unknown as NostrEvent;
+
+    expect(checkEvent(event, { identifier: 'x' })).toEqual({ idValid: false, signatureValid: false, identifierMatches: false });
+  });
 });

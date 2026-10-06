@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import type { NostrEvent } from '@nostrify/nostrify';
@@ -80,29 +80,72 @@ describe('EventPage', () => {
     expect(screen.getByText('not found')).toBeInTheDocument();
   });
 
-  it('shows a verified event with its details and JSON', () => {
-    renderAt(`/e/${ID}`, {
-      event,
-      verification: { idValid: true, signatureValid: true, authorMatches: true, kindMatches: true },
-      relays: [{ url: 'wss://relay.mostro.network', status: 'found', fromLink: true }],
-    });
+  const found = {
+    event,
+    verification: { idValid: true, signatureValid: true, authorMatches: true, kindMatches: true },
+    relays: [
+      { url: 'wss://relay.mostro.network', status: 'found', fromLink: true },
+      { url: 'wss://nos.lol', status: 'found', fromLink: true },
+      { url: 'wss://relay.damus.io', status: 'missing', fromLink: false },
+    ],
+  } satisfies Partial<EventLookup>;
 
+  it('shows the summaries of a verified event with the sections collapsed', () => {
+    renderAt(`/e/${ID}`, found);
+
+    expect(screen.getByText('Verified · 4 of 4 checks passed')).toBeInTheDocument();
+    expect(screen.getByText('Kind 38383 · NIP-69 Peer-to-peer Order events')).toBeInTheDocument();
+    expect(screen.getByText('Found on 2 relays · 3 checked')).toBeInTheDocument();
+    expect(screen.queryByText('Signature valid')).not.toBeInTheDocument();
+    expect(screen.queryByText(nip19.npubEncode(AUTHOR))).not.toBeInTheDocument();
+    expect(screen.queryByText('has it')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Copy JSON' })).toBeInTheDocument();
+  });
+
+  it('expands each section on click, independently', () => {
+    renderAt(`/e/${ID}`, found);
+
+    fireEvent.click(screen.getByText('Verified · 4 of 4 checks passed'));
     expect(screen.getByText('Signature valid')).toBeInTheDocument();
     expect(screen.getByText('Id matches content')).toBeInTheDocument();
     expect(screen.getByText('Author matches link')).toBeInTheDocument();
     expect(screen.getByText('Kind matches link')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Kind 38383 · NIP-69 Peer-to-peer Order events'));
     expect(screen.getByText(nip19.npubEncode(AUTHOR))).toBeInTheDocument();
-    expect(screen.getByText('has it')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Copy JSON' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Found on 2 relays · 3 checked'));
+    expect(screen.getAllByText('has it')).toHaveLength(2);
+    expect(screen.getByText('Signature valid')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('Verified · 4 of 4 checks passed'));
+    expect(screen.queryByText('Signature valid')).not.toBeInTheDocument();
   });
 
-  it('flags an event that fails verification', () => {
-    renderAt(`/e/${ID}`, {
-      event,
-      verification: { idValid: true, signatureValid: false },
-    });
+  it('counts only the checks the link allows', () => {
+    renderAt(`/e/${ID}`, { ...found, verification: { idValid: true, signatureValid: true } });
 
+    expect(screen.getByText('Verified · 2 of 2 checks passed')).toBeInTheDocument();
+  });
+
+  it('opens the verification on its own when a check fails', () => {
+    renderAt(`/e/${ID}`, { ...found, verification: { idValid: true, signatureValid: false } });
+
+    expect(screen.getByText('Verification failed · 1 of 2 checks passed')).toBeInTheDocument();
     expect(screen.getByText('Signature invalid')).toBeInTheDocument();
     expect(screen.queryByText('Author matches link')).not.toBeInTheDocument();
+  });
+
+  it('keeps counting relays while some are still searching', () => {
+    renderAt(`/e/${ID}`, {
+      ...found,
+      isSearching: true,
+      relays: [
+        { url: 'wss://nos.lol', status: 'found', fromLink: true },
+        { url: 'wss://relay.damus.io', status: 'pending', fromLink: false },
+      ],
+    });
+
+    expect(screen.getByText('Found on 1 relay · checking 2…')).toBeInTheDocument();
   });
 });

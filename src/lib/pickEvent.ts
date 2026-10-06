@@ -16,7 +16,8 @@ export interface PickResult {
   statuses: (CopyStatus | undefined)[];
 }
 
-function isNewer(a: NostrEvent, b: NostrEvent): boolean {
+/** Whether `a` replaces `b` as a version of the same address: newer, or same time and lower id (NIP-01). */
+export function isNewer(a: NostrEvent, b: NostrEvent): boolean {
   return a.created_at !== b.created_at ? a.created_at > b.created_at : a.id < b.id;
 }
 

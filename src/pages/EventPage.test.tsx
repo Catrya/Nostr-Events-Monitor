@@ -218,4 +218,75 @@ describe('EventPage', () => {
       expect(screen.getByText(/returned any version of this event/)).toBeInTheDocument();
     });
   });
+
+  describe('newer version on /e/', () => {
+    const D = 'a3ff4901-e1aa-4ea6-bb60-bd8f3c3fbff7';
+    const old: NostrEvent = { ...event, created_at: 1700000000, tags: [['d', D], ['s', 'pending']] };
+    const latest: NostrEvent = { ...event, id: 'b'.repeat(64), created_at: 1700000600, tags: [['d', D], ['s', 'success']] };
+    const valid = { idValid: true, signatureValid: true };
+    const relays = [{ url: 'wss://relay.mostro.network', status: 'found' as const, fromLink: true }];
+    const nevent = nip19.neventEncode({ id: ID, relays: ['wss://relay.mostro.network'] });
+
+    function renderWith(found: NostrEvent, foundValid: boolean, latestEvent?: NostrEvent) {
+      vi.mocked(useEventById).mockImplementation(ref => (ref
+        ? { event: found, verification: { idValid: true, signatureValid: foundValid }, relays, isSearching: false }
+        : empty));
+      vi.mocked(useAddressableEvent).mockImplementation(ref => (ref && latestEvent
+        ? { event: latestEvent, verification: valid, relays, isSearching: false }
+        : empty));
+      window.history.pushState({}, '', `/e/${nevent}`);
+      return render(
+        <TestApp>
+          <Routes>
+            <Route path="/e/:ref" element={<EventPage />} />
+          </Routes>
+        </TestApp>
+      );
+    }
+
+    it('looks up the latest version of a valid addressable event', () => {
+      renderWith(old, true);
+
+      expect(useAddressableEvent).toHaveBeenLastCalledWith({ kind: 38383, author: AUTHOR, identifier: D, relays: ['wss://relay.mostro.network'] });
+    });
+
+    it('links to the newer version when there is one', () => {
+      renderWith(old, true, latest);
+
+      expect(screen.getByText(/A newer version of this event exists/)).toBeInTheDocument();
+      const link = screen.getByRole('link', { name: 'View latest →' });
+      expect(link.getAttribute('href')).toMatch(/^\/a\/naddr1/);
+      expect(nip19.decode(link.getAttribute('href')!.slice(3))).toMatchObject({ type: 'naddr', data: { kind: 38383, pubkey: AUTHOR, identifier: D } });
+    });
+
+    it('shows no notice when the event is already the latest', () => {
+      renderWith(old, true, old);
+
+      expect(screen.queryByText(/A newer version of this event exists/)).not.toBeInTheDocument();
+    });
+
+    it('does not look for versions of a non-addressable event', () => {
+      renderWith({ ...event, kind: 1, tags: [] }, true);
+
+      expect(useAddressableEvent).toHaveBeenLastCalledWith(null);
+    });
+
+    it('does not look for versions of an event with an invalid signature', () => {
+      renderWith(old, false, latest);
+
+      expect(useAddressableEvent).toHaveBeenLastCalledWith(null);
+      expect(screen.queryByText(/A newer version of this event exists/)).not.toBeInTheDocument();
+    });
+
+    it('explains why an addressable event may be gone', () => {
+      renderAt(`/e/${nip19.neventEncode({ id: ID, kind: 38383 })}`);
+      expect(screen.getByText(/gets replaced by newer versions/)).toBeInTheDocument();
+    });
+
+    it('does not show that explanation for other kinds', () => {
+      renderAt(`/e/${nip19.neventEncode({ id: ID, kind: 1 })}`);
+      expect(screen.getByText('Event not found')).toBeInTheDocument();
+      expect(screen.queryByText(/gets replaced by newer versions/)).not.toBeInTheDocument();
+    });
+  });
 });

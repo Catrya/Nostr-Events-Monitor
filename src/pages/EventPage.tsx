@@ -12,7 +12,8 @@ import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useEventById, type RelayResult } from '@/hooks/useEventById';
 import { useAddressableEvent } from '@/hooks/useAddressableEvent';
 import { getKindInfo } from '@/data/kindInfo';
-import { parseAddressRef, parseEventRef } from '@/lib/eventRef';
+import { parseAddressRef, parseEventRef, type AddressRef } from '@/lib/eventRef';
+import { isNewer } from '@/lib/pickEvent';
 import type { NostrEvent } from '@nostrify/nostrify';
 import type { EventVerification } from '@/lib/verifyEvent';
 import { cn } from '@/lib/utils';
@@ -87,14 +88,19 @@ function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
   return isSearching ? `${foundText} · checking ${relays.length}…` : `${foundText} · ${relays.length} checked`;
 }
 
+function isVersioned(kind: number): boolean {
+  return kinds.isAddressableKind(kind) || kinds.isReplaceableKind(kind);
+}
+
+/** The `d` tag of an addressable event; empty for replaceable kinds, which have none. */
+function identifierOf(event: NostrEvent): string {
+  if (!kinds.isAddressableKind(event.kind) || !Array.isArray(event.tags)) return '';
+  return event.tags.find(t => t[0] === 'd')?.[1] ?? '';
+}
+
 /** `kind:pubkey:d` for addressable and replaceable events (NIP-01), undefined otherwise. */
 function eventAddress(event: NostrEvent): string | undefined {
-  if (kinds.isAddressableKind(event.kind)) {
-    const d = Array.isArray(event.tags) ? event.tags.find(t => t[0] === 'd')?.[1] : undefined;
-    return `${event.kind}:${event.pubkey}:${d ?? ''}`;
-  }
-  if (kinds.isReplaceableKind(event.kind)) return `${event.kind}:${event.pubkey}:`;
-  return undefined;
+  return isVersioned(event.kind) ? `${event.kind}:${event.pubkey}:${identifierOf(event)}` : undefined;
 }
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
@@ -117,8 +123,22 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
   const eventRef = mode === 'id' && eventParsed.ok ? eventParsed.ref : null;
   const addressRef = mode === 'address' && addressParsed.ok ? addressParsed.ref : null;
   const byId = useEventById(eventRef);
-  const byAddress = useAddressableEvent(addressRef);
+
+  // On /e/, a valid addressable event may have been replaced: look up its latest version too
+  const found = byId.event;
+  const foundValid = byId.verification?.signatureValid ?? false;
+  const latestRef = useMemo((): AddressRef | null => {
+    if (!eventRef || !found || !foundValid || !isVersioned(found.kind)) return null;
+    return { kind: found.kind, author: found.pubkey, identifier: identifierOf(found), relays: eventRef.relays };
+  }, [eventRef, found, foundValid]);
+
+  const byAddress = useAddressableEvent(addressRef ?? latestRef);
   const { event, verification, relays, isSearching } = mode === 'id' ? byId : byAddress;
+
+  const newer = mode === 'id' && found && byAddress.event && byAddress.verification?.signatureValid
+    && isNewer(byAddress.event, found)
+    ? byAddress.event
+    : undefined;
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   useSeoMeta({
@@ -178,6 +198,12 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
                 ? 'None of these relays returned the event. It may have been deleted, or it lives on other relays.'
                 : 'None of these relays returned any version of this event. It may have been deleted, or it lives on other relays.'}
             </p>
+            {eventRef?.kind !== undefined && isVersioned(eventRef.kind) && (
+              <p>
+                This kind of event gets replaced by newer versions, and relays usually keep only the latest one,
+                so this version may be gone. A <code translate="no">naddr1…</code> link always points to the latest version.
+              </p>
+            )}
           </Message>
         )}
         <Card className="border-accent/20 bg-card/50">
@@ -194,6 +220,20 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
     const allPassed = passed === total;
     body = (
       <>
+        {newer && (
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-sm">
+            <Info className="h-4 w-4 shrink-0 text-yellow-500" />
+            <span key={newer.id} className="min-w-0 flex-1">
+              {`A newer version of this event exists (published ${new Date(newer.created_at * 1000).toLocaleString()}).`}
+            </span>
+            <Link
+              to={`/a/${nip19.naddrEncode({ kind: newer.kind, pubkey: newer.pubkey, identifier: identifierOf(newer), relays: eventRef?.relays })}`}
+              className="shrink-0 text-accent hover:underline"
+            >
+              View latest →
+            </Link>
+          </div>
+        )}
         <Card className="panel-corner border-accent/20 bg-card/50 divide-y divide-accent/10">
           <Section
             key={`${event.id}-${event.sig}`}

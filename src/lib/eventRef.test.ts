@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { nip19 } from 'nostr-tools';
-import { parseEventRef } from './eventRef';
+import { parseAddressRef, parseEventRef } from './eventRef';
 
 const ID = '7287ca0d61a697ebe107ade2085ad4f41640f8b844bd79f455a743e8ceb0c1f2';
 const AUTHOR = '00000235a3e904cfe1213a8a54d6f1ec1bef7cc6bfaabd6193e82931ccf1366a';
@@ -54,6 +54,40 @@ describe('parseEventRef', () => {
   it('rejects anything else', () => {
     for (const input of ['', 'hello', ID.slice(1), 'nevent1invalid', `${ID}0`]) {
       expect(parseEventRef(input)).toEqual({ ok: false, error: 'invalid' });
+    }
+  });
+});
+
+describe('parseAddressRef', () => {
+  it('parses a naddr with relays', () => {
+    const naddr = nip19.naddrEncode({ kind: 38383, pubkey: AUTHOR, identifier: 'a3ff4901-e1aa-4ea6-bb60-bd8f3c3fbff7', relays: ['wss://relay.mostro.network', 'https://example.com'] });
+
+    expect(parseAddressRef(naddr)).toEqual({
+      ok: true,
+      ref: { kind: 38383, author: AUTHOR, identifier: 'a3ff4901-e1aa-4ea6-bb60-bd8f3c3fbff7', relays: ['wss://relay.mostro.network'] },
+    });
+  });
+
+  it('keeps an empty identifier (replaceable kinds) and accepts the nostr: prefix', () => {
+    const naddr = nip19.naddrEncode({ kind: 10002, pubkey: AUTHOR, identifier: '' });
+
+    expect(parseAddressRef(` nostr:${naddr}`)).toEqual({ ok: true, ref: { kind: 10002, author: AUTHOR, identifier: '', relays: [] } });
+  });
+
+  it('keeps the case of the identifier', () => {
+    const naddr = nip19.naddrEncode({ kind: 30023, pubkey: AUTHOR, identifier: 'My-Article' });
+
+    expect(parseAddressRef(naddr.toUpperCase())).toMatchObject({ ok: true, ref: { identifier: 'My-Article' } });
+  });
+
+  it('reports other NIP-19 entities as unsupported', () => {
+    expect(parseAddressRef(nip19.neventEncode({ id: ID }))).toEqual({ ok: false, error: 'unsupported', type: 'nevent' });
+    expect(parseAddressRef(nip19.noteEncode(ID))).toEqual({ ok: false, error: 'unsupported', type: 'note' });
+  });
+
+  it('rejects anything else, including hex ids', () => {
+    for (const input of ['', 'hello', ID, 'naddr1invalid']) {
+      expect(parseAddressRef(input)).toEqual({ ok: false, error: 'invalid' });
     }
   });
 });

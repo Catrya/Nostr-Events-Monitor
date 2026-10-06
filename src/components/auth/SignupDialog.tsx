@@ -88,14 +88,14 @@ const SignupDialog: React.FC<SignupDialogProps> = ({ isOpen, onClose }) => {
       <DialogContent className='sm:max-w-md p-0 overflow-hidden rounded-2xl'>
         <DialogHeader className='px-6 pt-6 pb-0 relative'>
           <DialogTitle className='text-xl font-semibold text-center'>
-            {step === 'generate' && 'Create Your Account'}
-            {step === 'download' && 'Download Your Key'}
-            {step === 'done' && 'Setting Up Your Account'}
+            {step === 'generate' && <span>Create Your Account</span>}
+            {step === 'download' && <span>Download Your Key</span>}
+            {step === 'done' && <span>Setting Up Your Account</span>}
           </DialogTitle>
           <DialogDescription className='text-center text-muted-foreground mt-2'>
-            {step === 'generate' && 'Generate a secure key for your account'}
-            {step === 'download' && "Keep your key safe - you'll need it to log in"}
-            {step === 'done' && 'Finalizing your account setup'}
+            {step === 'generate' && <span>Generate a secure key for your account</span>}
+            {step === 'download' && <span>Keep your key safe - you'll need it to log in</span>}
+            {step === 'done' && <span>Finalizing your account setup</span>}
           </DialogDescription>
         </DialogHeader>
 

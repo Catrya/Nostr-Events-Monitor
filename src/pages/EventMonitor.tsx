@@ -625,12 +625,12 @@ export function EventMonitor() {
           <div className="topbar-right">
             <span className="status-pill">
               <span className={`led ${validRelays.length > 0 ? 'on' : 'off'}`} />
-              {validRelays.length} relay{validRelays.length !== 1 ? 's' : ''} connected
+              <span key={validRelays.length}>{`${validRelays.length} relay${validRelays.length !== 1 ? 's' : ''} connected`}</span>
             </span>
             {isStreaming && (
               <span className="status-pill">
                 <span className="led violet" />
-                streaming{streamPhase === 'live' ? ` · ${eventRate}/s` : streamPhase === 'connecting' ? ' · connecting' : ' · loading'}
+                streaming<span translate="no">{streamPhase === 'live' ? ` · ${eventRate}/s` : streamPhase === 'connecting' ? ' · connecting' : ' · loading'}</span>
               </span>
             )}
             <button
@@ -694,7 +694,7 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div className="ml-auto text-[11px] font-mono text-muted-foreground">
+                <div key={queryType} className="ml-auto text-[11px] font-mono text-muted-foreground">
                   {queryType === 'nip' ? 'resolves NIPs → kinds' : 'direct event kind numbers'}
                 </div>
               </div>
@@ -835,9 +835,9 @@ export function EventMonitor() {
                           className="flex items-center gap-1 text-xs text-accent hover:underline"
                         >
                           {kindsExpanded ? (
-                            <><ChevronUp className="h-3 w-3" />Show less</>
+                            <><ChevronUp className="h-3 w-3" /><span>Show less</span></>
                           ) : (
-                            <><ChevronDown className="h-3 w-3" />Show {filters.kinds.length - 3} more kinds</>
+                            <><ChevronDown className="h-3 w-3" /><span key={filters.kinds.length}>{`Show ${filters.kinds.length - 3} more kinds`}</span></>
                           )}
                         </button>
                       )}
@@ -1106,7 +1106,7 @@ export function EventMonitor() {
                     >
                       Search
                     </Button>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span key={String(noRelayHint)} className="text-[10px] text-muted-foreground">
                       {noRelayHint === 'search' ? 'Enter a relay first' : 'Fetch once'}
                     </span>
                   </div>
@@ -1129,7 +1129,7 @@ export function EventMonitor() {
                         Stream
                       </Button>
                     )}
-                    <span className="text-[10px] text-muted-foreground">
+                    <span key={`${noRelayHint}-${isStreaming}`} className="text-[10px] text-muted-foreground">
                       {noRelayHint === 'stream' ? 'Enter a relay first' : isStreaming ? 'Stop streaming' : 'Real-time'}
                     </span>
                   </div>
@@ -1147,9 +1147,9 @@ export function EventMonitor() {
                 </div>
 
                 <div className="ml-auto flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">
-                  <span><span style={{ color: 'var(--c-accent)' }}>{activeFilters}</span> filter{activeFilters !== 1 ? 's' : ''} active</span>
+                  <span><span translate="no" style={{ color: 'var(--c-accent)' }}>{activeFilters}</span> <span key={activeFilters !== 1 ? 'plural' : 'singular'}>{`filter${activeFilters !== 1 ? 's' : ''} active`}</span></span>
                   <span>·</span>
-                  <span>mode: <span style={{ color: 'var(--c-accent-glow)' }}>{mode}/{queryType}</span></span>
+                  <span>mode: <span translate="no" style={{ color: 'var(--c-accent-glow)' }}>{`${mode}/${queryType}`}</span></span>
                 </div>
               </div>
             </form>
@@ -1160,17 +1160,18 @@ export function EventMonitor() {
         <div className="space-y-3">
           <div className="flex items-center justify-between gap-4 flex-wrap">
             <h2 className="text-xl font-semibold text-foreground">
-              Events {streamingLabelSuffix}
+              Events <span translate="no">{streamingLabelSuffix}</span>
               {isStreaming && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  {streamPhase === 'connecting' && '-- Connecting...'}
-                  {streamPhase === 'historical' && '-- Loading stored events...'}
-                  {streamPhase === 'live' && '-- Live'}
+                  {streamPhase === 'connecting' && <span>-- Connecting...</span>}
+                  {streamPhase === 'historical' && <span>-- Loading stored events...</span>}
+                  {streamPhase === 'live' && <span>-- Live</span>}
                 </span>
               )}
               {activeFilters > 0 && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  {isStreaming ? '| ' : '-- '}{activeFilters} filter{activeFilters !== 1 ? 's' : ''} active
+                  <span translate="no">{`${isStreaming ? '| ' : '-- '}${activeFilters} `}</span>
+                  <span key={activeFilters !== 1 ? 'plural' : 'singular'}>{`filter${activeFilters !== 1 ? 's' : ''} active`}</span>
                 </span>
               )}
             </h2>
@@ -1181,12 +1182,12 @@ export function EventMonitor() {
             <div className="stream-bar">
               <span className="live-label"><span className="led violet" />LIVE</span>
               <span className="stream-phase">
-                {streamPhase === 'connecting' && 'connecting'}
-                {streamPhase === 'historical' && 'loading history'}
-                {streamPhase === 'live' && 'live'}
+                {streamPhase === 'connecting' && <span>connecting</span>}
+                {streamPhase === 'historical' && <span>loading history</span>}
+                {streamPhase === 'live' && <span>live</span>}
               </span>
               {streamPhase === 'live' && (
-                <span className="stream-rate">
+                <span className="stream-rate" translate="no">
                   <span className="n">{eventRate}</span> events/sec · <span className="n">{displayEvents.length}</span> captured
                 </span>
               )}
@@ -1203,8 +1204,8 @@ export function EventMonitor() {
           {displayEvents.length > 0 && relayStats.size > 0 && (
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               {Array.from(relayStats.entries()).map(([relay, count]) => (
-                <Badge key={relay} variant="outline" className="text-xs">
-                  {relay.replace('wss://', '').replace('ws://', '')}: {count} event{count !== 1 ? 's' : ''}
+                <Badge key={relay} variant="outline" className="text-xs" translate="no">
+                  {`${relay.replace('wss://', '').replace('ws://', '')}: ${count} event${count !== 1 ? 's' : ''}`}
                 </Badge>
               ))}
             </div>
@@ -1217,7 +1218,7 @@ export function EventMonitor() {
                 if (isNaN(kind)) return null;
                 const info = getKindInfo(kind);
                 return (
-                  <span key={index} className="inline-flex items-center gap-1">
+                  <span key={`${index}-${kind}`} className="inline-flex items-center gap-1">
                     Event kind <strong>{kind}</strong>:{' '}
                     {info.link ? (
                       <a href={info.link} target="_blank" rel="noopener noreferrer">
@@ -1253,7 +1254,7 @@ export function EventMonitor() {
               <CardContent className="py-12 text-center space-y-4">
                 <div className="flex items-center justify-center gap-2">
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-accent"></div>
-                  <p className="text-foreground font-medium">
+                  <p key={`${isStreaming}-${streamPhase}`} className="text-foreground font-medium">
                     {isStreaming
                       ? streamPhase === 'connecting' ? 'Connecting to relays...' : 'Loading stored events...'
                       : 'Loading...'}
@@ -1261,13 +1262,13 @@ export function EventMonitor() {
                 </div>
                 {validRelays.length > 0 && (
                   <div className="text-sm text-muted-foreground space-y-2">
-                    <p>Connected to {validRelays.length} relay{validRelays.length !== 1 ? 's' : ''}:</p>
+                    <p key={validRelays.length}>{`Connected to ${validRelays.length} relay${validRelays.length !== 1 ? 's' : ''}:`}</p>
                     <div className="flex flex-wrap gap-1 justify-center">
                       {validRelays.map((relay, idx) => (
-                        <code key={idx} className="bg-muted px-2 py-1 rounded text-xs">{relay}</code>
+                        <code key={idx} className="bg-muted px-2 py-1 rounded text-xs" translate="no">{relay}</code>
                       ))}
                     </div>
-                    <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded">
+                    <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded" translate="no">
                       {filters.kinds.filter(k => k.trim() !== '').join(', ') || 'all kinds'}
                     </code></p>
                   </div>
@@ -1323,13 +1324,13 @@ export function EventMonitor() {
               <CardContent className="py-12 text-center space-y-4">
                 <p className="text-muted-foreground">No events found</p>
                 <div className="text-sm text-muted-foreground space-y-2">
-                  <p>Connected to {validRelays.length} relay{validRelays.length !== 1 ? 's' : ''}:</p>
+                  <p key={validRelays.length}>{`Connected to ${validRelays.length} relay${validRelays.length !== 1 ? 's' : ''}:`}</p>
                   <div className="flex flex-wrap gap-1 justify-center">
                     {validRelays.map((relay, idx) => (
-                      <code key={idx} className="bg-muted px-2 py-1 rounded text-xs">{relay}</code>
+                      <code key={idx} className="bg-muted px-2 py-1 rounded text-xs" translate="no">{relay}</code>
                     ))}
                   </div>
-                  <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded">
+                  <p>Searching for event kinds: <code className="bg-muted px-2 py-1 rounded" translate="no">
                     {filters.kinds.filter(k => k.trim() !== '').join(', ') || 'all kinds'}
                   </code></p>
                   <div className="text-xs space-y-1">
@@ -1354,6 +1355,7 @@ export function EventMonitor() {
                     {event.relayUrls.map((url) => (
                       <Badge
                         key={url}
+                        translate="no"
                         variant="secondary"
                         className="text-xs bg-accent/20 border-accent/40"
                       >
@@ -1376,7 +1378,7 @@ export function EventMonitor() {
                   )}
                 </Button>
               </div>
-              <CardContent className="p-4 pt-2">
+              <CardContent className="p-4 pt-2" translate="no">
                 <JsonViewer data={event} />
               </CardContent>
             </Card>

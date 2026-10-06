@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, Navigate, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { nip19 } from 'nostr-tools';
+import { kinds, nip19 } from 'nostr-tools';
 import { ArrowLeft, Check, ChevronDown, CircleCheck, CircleMinus, CircleX, Copy, Info, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,8 +10,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { JsonViewer } from '@/components/JsonViewer';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { useEventById, type RelayResult } from '@/hooks/useEventById';
+import { useAddressableEvent } from '@/hooks/useAddressableEvent';
 import { getKindInfo } from '@/data/kindInfo';
-import { parseEventRef } from '@/lib/eventRef';
+import { parseAddressRef, parseEventRef } from '@/lib/eventRef';
+import type { NostrEvent } from '@nostrify/nostrify';
 import type { EventVerification } from '@/lib/verifyEvent';
 import { cn } from '@/lib/utils';
 
@@ -72,16 +74,27 @@ function Section({ icon, summary, summaryClassName, defaultOpen = false, childre
   );
 }
 
-/** Signature and id always; author and kind only when the link includes them. */
+/** Signature and id always; author, kind and d tag only when the link includes them. */
 function countChecks(v: EventVerification) {
-  const checks = [v.signatureValid, v.idValid, v.authorMatches, v.kindMatches].filter((c): c is boolean => c !== undefined);
+  const checks = [v.signatureValid, v.idValid, v.authorMatches, v.kindMatches, v.identifierMatches].filter((c): c is boolean => c !== undefined);
   return { passed: checks.filter(Boolean).length, total: checks.length };
 }
 
 function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
   const found = relays.filter(r => r.status === 'found').length;
-  const foundText = `Found on ${found} relay${found !== 1 ? 's' : ''}`;
+  const outdated = relays.filter(r => r.status === 'outdated').length;
+  const foundText = `Found on ${found} relay${found !== 1 ? 's' : ''}${outdated ? ` · ${outdated} outdated` : ''}`;
   return isSearching ? `${foundText} · checking ${relays.length}…` : `${foundText} · ${relays.length} checked`;
+}
+
+/** `kind:pubkey:d` for addressable and replaceable events (NIP-01), undefined otherwise. */
+function eventAddress(event: NostrEvent): string | undefined {
+  if (kinds.isAddressableKind(event.kind)) {
+    const d = Array.isArray(event.tags) ? event.tags.find(t => t[0] === 'd')?.[1] : undefined;
+    return `${event.kind}:${event.pubkey}:${d ?? ''}`;
+  }
+  if (kinds.isReplaceableKind(event.kind)) return `${event.kind}:${event.pubkey}:`;
+  return undefined;
 }
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
@@ -93,34 +106,60 @@ function Message({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function EventPage() {
+/**
+ * - `id` (`/e/:ref`): one exact event, by nevent, note or hex id.
+ * - `address` (`/a/:ref`): the latest version of an addressable event, by naddr.
+ */
+export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
   const { ref: param = '' } = useParams();
-  const parsed = useMemo(() => parseEventRef(param), [param]);
-  const ref = parsed.ok ? parsed.ref : null;
-  const { event, verification, relays, isSearching } = useEventById(ref);
+  const eventParsed = useMemo(() => parseEventRef(param), [param]);
+  const addressParsed = useMemo(() => parseAddressRef(param), [param]);
+  const eventRef = mode === 'id' && eventParsed.ok ? eventParsed.ref : null;
+  const addressRef = mode === 'address' && addressParsed.ok ? addressParsed.ref : null;
+  const byId = useEventById(eventRef);
+  const byAddress = useAddressableEvent(addressRef);
+  const { event, verification, relays, isSearching } = mode === 'id' ? byId : byAddress;
   const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   useSeoMeta({
-    title: ref ? `Event ${ref.id.slice(0, 8)}… | Nostr Event Monitor` : 'Event | Nostr Event Monitor',
+    title: eventRef
+      ? `Event ${eventRef.id.slice(0, 8)}… | Nostr Event Monitor`
+      : addressRef
+        ? `Event ${addressRef.kind}:${addressRef.identifier.slice(0, 8)} | Nostr Event Monitor`
+        : 'Event | Nostr Event Monitor',
     description: 'Inspect and verify a Nostr event: signature, id, relays and raw JSON.',
   });
+
+  // A link pasted under the wrong prefix goes to the right page
+  if (mode === 'id' && !eventParsed.ok && addressParsed.ok) return <Navigate to={`/a/${param}`} replace />;
+  if (mode === 'address' && eventParsed.ok) return <Navigate to={`/e/${param}`} replace />;
+
+  const parsed = mode === 'id' ? eventParsed : addressParsed;
+  const ref = eventRef ?? addressRef;
 
   let body: ReactNode;
   if (!parsed.ok && parsed.error === 'unsupported') {
     body = (
-      <Message title="Link type not supported yet">
+      <Message title="Link type not supported">
         <p>
-          This is a <code translate="no">{parsed.type}</code> link. Only links to a single event are supported for now:{' '}
-          <code translate="no">nevent1…</code>, <code translate="no">note1…</code> or a hex event id.
+          This is a <code translate="no">{parsed.type}</code> link. Event pages accept{' '}
+          <code translate="no">nevent1…</code>, <code translate="no">note1…</code>, a hex event id or{' '}
+          <code translate="no">naddr1…</code>.
         </p>
       </Message>
     );
   } else if (!ref) {
-    body = (
+    body = mode === 'id' ? (
       <Message title="Invalid event link">
         <p>
           Use <code translate="no">/e/</code> followed by a <code translate="no">nevent1…</code>,{' '}
           <code translate="no">note1…</code> or a 64-character hex event id.
+        </p>
+      </Message>
+    ) : (
+      <Message title="Invalid address link">
+        <p>
+          Use <code translate="no">/a/</code> followed by a <code translate="no">naddr1…</code>.
         </p>
       </Message>
     );
@@ -134,7 +173,11 @@ export function EventPage() {
           </div>
         ) : (
           <Message title="Event not found">
-            <p>None of these relays returned the event. It may have been deleted, or it lives on other relays.</p>
+            <p>
+              {mode === 'id'
+                ? 'None of these relays returned the event. It may have been deleted, or it lives on other relays.'
+                : 'None of these relays returned any version of this event. It may have been deleted, or it lives on other relays.'}
+            </p>
           </Message>
         )}
         <Card className="border-accent/20 bg-card/50">
@@ -146,6 +189,7 @@ export function EventPage() {
     );
   } else {
     const kindInfo = getKindInfo(event.kind);
+    const address = eventAddress(event);
     const { passed, total } = countChecks(verification!);
     const allPassed = passed === total;
     body = (
@@ -185,6 +229,13 @@ export function EventPage() {
                   detail="The link says which kind of event it is."
                 />
               )}
+              {verification!.identifierMatches !== undefined && (
+                <CheckRow
+                  ok={verification!.identifierMatches}
+                  label={verification!.identifierMatches ? 'd tag matches link' : 'd tag differs from link'}
+                  detail="The link says which addressable event it is."
+                />
+              )}
             </div>
           </Section>
 
@@ -211,6 +262,12 @@ export function EventPage() {
               <dd translate="no">{new Date(event.created_at * 1000).toLocaleString()}</dd>
               <dt className="text-muted-foreground">Id</dt>
               <dd translate="no" className="font-mono text-xs break-all">{event.id}</dd>
+              {address && (
+                <>
+                  <dt className="text-muted-foreground">Address</dt>
+                  <dd translate="no" className="font-mono text-xs break-all">{address}</dd>
+                </>
+              )}
             </dl>
           </Section>
 
@@ -257,6 +314,11 @@ export function EventPage() {
 
       <div className="max-w-6xl mx-auto p-4 space-y-4">
         <h1 className="text-xl font-semibold">Nostr event</h1>
+        {mode === 'address' && (
+          <p className="text-sm text-muted-foreground">
+            Latest version of an addressable event. Its author can replace it with newer versions.
+          </p>
+        )}
         {body}
       </div>
     </div>

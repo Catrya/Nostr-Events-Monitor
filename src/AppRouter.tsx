@@ -14,6 +14,7 @@ export function AppRouter() {
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/e/:ref" element={<EventPage />} />
+        <Route path="/a/:ref" element={<EventPage mode="address" />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
         <Route path="*" element={<NotFound />} />
       </Routes>

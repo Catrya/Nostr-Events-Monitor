@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNipInfo } from './kindInfo';
+import { getKindInfo, getKindsForNip, getNipInfo } from './kindInfo';
 
 describe('getNipInfo', () => {
   it('knows NIPs added to the official list', () => {
@@ -16,5 +16,25 @@ describe('getNipInfo', () => {
 
   it('returns null for unknown NIPs', () => {
     expect(getNipInfo('ZZ')).toBeNull();
+  });
+});
+
+describe('getKindInfo', () => {
+  it('knows kinds added to the official list', () => {
+    expect(getKindInfo(54)).toMatchObject({ nip: 'NIP-F4', description: 'Podcast Episode' });
+    expect(getKindInfo(21059)).toMatchObject({ nip: 'NIP-59', description: 'Ephemeral Gift Wrap', classification: 'ephemeral' });
+    expect(getKindInfo(38000)).toMatchObject({ nip: 'NIP-87', classification: 'addressable' });
+  });
+
+  it('links kinds whose spec became an official NIP', () => {
+    expect(getKindInfo(37516)).toMatchObject({ nip: 'NIP-CC', link: 'https://github.com/nostr-protocol/nips/blob/master/CC.md' });
+    expect(getKindInfo(24242)).toMatchObject({ nip: 'NIP-B7', link: 'https://github.com/nostr-protocol/nips/blob/master/B7.md' });
+  });
+});
+
+describe('getKindsForNip', () => {
+  it('finds the kinds of a new NIP', () => {
+    expect(getKindsForNip('CC')).toEqual([7516, 7517, 37516, 37517]);
+    expect(getKindsForNip('F4')).toEqual([54, 10154]);
   });
 });

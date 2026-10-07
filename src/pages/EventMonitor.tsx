@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { NostrEvent, NRelay1, NostrFilter, NostrRelayEVENT } from '@nostrify/nostrify';
 import { nip19 } from 'nostr-tools';
 import { Input } from '@/components/ui/input';
@@ -11,10 +12,12 @@ import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { CopyEventButton, ShareEventButton } from '@/components/EventCardActions';
 import { Walkthrough, WALK_STORAGE_KEY } from '@/components/Walkthrough';
-import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
 import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
 import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
+import { parseTagFilter, queryToSearch, searchToQuery } from '@/lib/searchParams';
 
 interface EventFilters {
   relays: string[];
@@ -65,24 +68,28 @@ function decodeAuthor(author: string): string {
 }
 
 export function EventMonitor() {
-  const [filters, setFilters] = useState<EventFilters>({
-    relays: [''],
-    kinds: [''],
-    limit: '',
-    authors: [''],
-    since: '',
-    until: '',
-    tags: ['']
-  });
-  const [mode, setMode] = useState<'search' | 'stream'>('search');
-  const [queryType, setQueryType] = useState<QueryType>('kind');
+  const location = useLocation();
+  const navigate = useNavigate();
+  // A shared search link (?relays=…&kinds=…) fills the form when the page opens
+  const [sharedSearch] = useState(() => queryToSearch(location.search));
+  const [filters, setFilters] = useState<EventFilters>(() => ({
+    relays: sharedSearch?.relays ?? [''],
+    kinds: sharedSearch?.kinds ?? [''],
+    limit: sharedSearch?.limit ?? '',
+    authors: sharedSearch?.authors ?? [''],
+    since: sharedSearch?.since ?? '',
+    until: sharedSearch?.until ?? '',
+    tags: sharedSearch?.tags ?? ['']
+  }));
+  const [mode, setMode] = useState<'search' | 'stream'>(sharedSearch?.mode ?? 'search');
+  const [queryType, setQueryType] = useState<QueryType>(sharedSearch?.queryType ?? 'kind');
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamPhase, setStreamPhase] = useState<'connecting' | 'historical' | 'live'>('connecting');
   const [streamEvents, setStreamEvents] = useState<EventWithRelay[]>([]);
   const [lastDisplayedEvents, setLastDisplayedEvents] = useState<EventWithRelay[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [noRelayHint, setNoRelayHint] = useState<'search' | 'stream' | null>(null);
-  const [nipFilter, setNipFilter] = useState<string[]>(['']);
+  const [nipFilter, setNipFilter] = useState<string[]>(sharedSearch?.nips ?? ['']);
   const [nipKinds, setNipKinds] = useState<number[]>([]);
   const [nipMessage, setNipMessage] = useState<string | null>(null);
   const [kindsExpanded, setKindsExpanded] = useState(false);
@@ -94,13 +101,13 @@ export function EventMonitor() {
   const previousRelaysRef = useRef<string[]>(filters.relays);
   const rateWindowRef = useRef<number[]>([]);
 
-  // Walkthrough on first visit
+  // Walkthrough on first visit, unless it came from a shared search: the results matter more
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || sharedSearch) return;
     if (!localStorage.getItem(WALK_STORAGE_KEY)) {
       setWalkOpen(true);
     }
-  }, []);
+  }, [sharedSearch]);
 
   const closeWalkthrough = useCallback(() => {
     setWalkOpen(false);
@@ -144,8 +151,9 @@ export function EventMonitor() {
 
     const validTags = filters.tags.filter(t => t.trim() !== '');
     for (const tag of validTags) {
-      const [tagName, tagValue] = tag.split(':').map(s => s.trim());
-      if (tagName && tagValue) {
+      const parsed = parseTagFilter(tag);
+      if (parsed) {
+        const [tagName, tagValue] = parsed;
         const filterKey = `#${tagName}` as keyof NostrFilter;
         const existing = qf[filterKey] as string[] | undefined;
         qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;
@@ -199,8 +207,9 @@ export function EventMonitor() {
 
       const validTags = filters.tags.filter(t => t.trim() !== '');
       for (const tag of validTags) {
-        const [tagName, tagValue] = tag.split(':').map(s => s.trim());
-        if (tagName && tagValue) {
+        const parsed = parseTagFilter(tag);
+        if (parsed) {
+          const [tagName, tagValue] = parsed;
           const filterKey = `#${tagName}` as keyof NostrFilter;
           const existing = qf[filterKey] as string[] | undefined;
           qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;
@@ -409,6 +418,21 @@ export function EventMonitor() {
     return () => clearInterval(id);
   }, [isStreaming, streamPhase]);
 
+  const searchQuery = useMemo(
+    () => searchToQuery({ ...filters, nips: nipFilter, mode, queryType }),
+    [filters, nipFilter, mode, queryType],
+  );
+
+  const { isCopied: isSearchCopied, copyToClipboard } = useCopyToClipboard();
+  const shareSearch = useCallback(() => {
+    copyToClipboard(`${window.location.origin}/${searchQuery ? `?${searchQuery}` : ''}`);
+  }, [copyToClipboard, searchQuery]);
+
+  // Keeps the address bar on the last search, so a reload or a copied URL brings it back
+  const syncUrl = useCallback((query: string) => {
+    navigate({ search: query ? `?${query}` : '' }, { replace: true });
+  }, [navigate]);
+
   const resolveNipKinds = useCallback((): number[] | null => {
     const validNips = nipFilter.filter(n => n.trim() !== '');
     if (validNips.length === 0) {
@@ -481,8 +505,9 @@ export function EventMonitor() {
       if (!resolved) return;
     }
 
+    syncUrl(searchQuery);
     setTimeout(() => refetch(), 0);
-  }, [validRelays.length, refetch, queryType, resolveNipKinds]);
+  }, [validRelays.length, refetch, queryType, resolveNipKinds, syncUrl, searchQuery]);
 
   const handleStream = useCallback(() => {
     if (validRelays.length === 0) {
@@ -497,9 +522,18 @@ export function EventMonitor() {
       if (!resolved) return;
     }
 
+    syncUrl(searchQuery);
     setIsStreaming(false);
     setTimeout(() => setIsStreaming(true), 0);
-  }, [validRelays.length, queryType, resolveNipKinds]);
+  }, [validRelays.length, queryType, resolveNipKinds, syncUrl, searchQuery]);
+
+  // A shared search runs on its own; a shared stream waits for the visitor to start it
+  const sharedSearchRanRef = useRef(false);
+  useEffect(() => {
+    if (sharedSearchRanRef.current || !sharedSearch || sharedSearch.mode === 'stream') return;
+    sharedSearchRanRef.current = true;
+    handleSearch();
+  }, [sharedSearch, handleSearch]);
 
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
@@ -563,7 +597,11 @@ export function EventMonitor() {
     setNipKinds([]);
     setNipMessage(null);
     setKindsExpanded(false);
-  }, []);
+    syncUrl(searchToQuery({
+      relays: filters.relays, kinds: [], nips: [], authors: [], tags: [],
+      since: '', until: '', limit: '', mode, queryType: 'kind',
+    }));
+  }, [syncUrl, filters.relays, mode]);
 
   const addSuggestedRelay = useCallback((host: string) => {
     const url = `wss://${host}`;
@@ -1126,6 +1164,20 @@ export function EventMonitor() {
                     Clear Filters
                   </Button>
                   <span className="text-[10px] text-muted-foreground">&nbsp;</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={shareSearch}
+                    className="h-8 px-4 text-xs gap-1.5 bg-accent/10 border-accent/30 hover:bg-accent/20"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Share search
+                  </Button>
+                  <span key={String(isSearchCopied)} className={`text-[10px] ${isSearchCopied ? 'text-green-500' : 'text-muted-foreground'}`}>
+                    {isSearchCopied ? 'Link copied' : 'Copy link'}
+                  </span>
                 </div>
 
                 <div className="ml-auto flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">

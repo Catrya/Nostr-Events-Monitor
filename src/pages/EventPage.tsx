@@ -280,10 +280,13 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
                 {' · '}
                 {kindInfo.link ? (
                   <a href={kindInfo.link} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                    {`${kindInfo.nip} ${kindInfo.description}`}
+                    {kindInfo.nip ? `${kindInfo.nip} ${kindInfo.description}` : kindInfo.description}
                   </a>
                 ) : (
                   <span>{kindInfo.description}</span>
+                )}
+                {kindInfo.unrecommended && (
+                  <div className="text-xs text-yellow-500">{`${kindInfo.nip} is unrecommended: ${kindInfo.unrecommended}.`}</div>
                 )}
               </dd>
               <dt className="text-muted-foreground">Author</dt>

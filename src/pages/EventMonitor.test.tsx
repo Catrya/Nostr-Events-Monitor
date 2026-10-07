@@ -119,4 +119,24 @@ describe('EventMonitor shared search', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?relays=relay.mostro.network&kinds=38383`));
     expect(await screen.findByText('Link copied')).toBeInTheDocument();
   });
+
+  it('describes a kind without a NIP by its description only', () => {
+    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    renderAt('/?relays=kindinfo.example.com&kinds=25050&mode=stream');
+
+    expect(screen.getByRole('link', { name: 'Call Offer' })).toBeInTheDocument();
+  });
+
+  it('marks the kind of an unrecommended NIP', () => {
+    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    renderAt('/?relays=unrec.example.com&kinds=4&mode=stream');
+
+    expect(screen.getByText('unrecommended')).toHaveAttribute('title', 'NIP-04 is unrecommended: deprecated in favor of NIP-17');
+  });
+
+  it('warns when searching an unrecommended NIP', async () => {
+    renderAt('/?relays=nipwarn.example.com&nips=4');
+
+    expect(await screen.findByText('NIP-04 is unrecommended: deprecated in favor of NIP-17.')).toBeInTheDocument();
+  });
 });

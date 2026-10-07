@@ -139,6 +139,13 @@ describe('EventPage', () => {
     expect(screen.queryByText('Signature valid')).not.toBeInTheDocument();
   });
 
+  it('explains when the kind belongs to an unrecommended NIP', () => {
+    renderAt(`/e/${ID}`, { ...found, event: { ...event, kind: 4, tags: [] } });
+
+    fireEvent.click(screen.getByText('Kind 4 · NIP-04 Encrypted Direct Messages'));
+    expect(screen.getByText('NIP-04 is unrecommended: deprecated in favor of NIP-17.')).toBeInTheDocument();
+  });
+
   it('counts only the checks the link allows', () => {
     renderAt(`/e/${ID}`, { ...found, verification: { idValid: true, signatureValid: true } });
 

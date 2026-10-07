@@ -27,8 +27,14 @@ export default {
           attr.key && attr.key.value === 'src'
         );
 
+        // Structured data (JSON-LD) is a data block the browser never runs, so it is allowed
+        const type = node.attributes && node.attributes.find(attr =>
+          attr.key && attr.key.value === 'type'
+        );
+        const isJsonLd = type && type.value && type.value.value === 'application/ld+json';
+
         // If the script has content but no src attribute, it's an inline script
-        if (hasContent && !hasSrc) {
+        if (hasContent && !hasSrc && !isJsonLd) {
           context.report({
             node,
             messageId: 'noInlineScript',

@@ -52,7 +52,6 @@ npm run dev
 
 - `wss://relay.mostro.network`
 - `wss://relay.damus.io`
-- `wss://relay.nostr.band`
 - `wss://relay.primal.net`
 
 

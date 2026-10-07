@@ -2,7 +2,6 @@ export const SUGGESTED_RELAYS: string[] = [
   'relay.damus.io',
   'relay.primal.net',
   'nos.lol',
-  'relay.nostr.band',
   'relay.mostro.network',
 ];
 

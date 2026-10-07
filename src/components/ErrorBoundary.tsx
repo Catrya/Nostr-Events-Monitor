@@ -31,7 +31,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     if (!error) return this.props.children;
 
     return (
-      <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
+      <div className="min-h-screen text-foreground flex items-center justify-center p-4">
         <div className="max-w-md text-center space-y-4">
           <h1 className="text-xl font-semibold">Something went wrong</h1>
           <p className="text-sm text-muted-foreground">

@@ -22,7 +22,7 @@ function CheckRow({ ok, label, detail }: { ok: boolean; label: string; detail: s
   return (
     <div className="flex items-start gap-2">
       {ok
-        ? <CircleCheck className="h-4 w-4 mt-0.5 shrink-0 text-green-500" aria-label="ok" />
+        ? <CircleCheck className="h-4 w-4 mt-0.5 shrink-0 text-ok" aria-label="ok" />
         : <CircleX className="h-4 w-4 mt-0.5 shrink-0 text-destructive" aria-label="failed" />}
       <div>
         <div className={ok ? 'text-foreground' : 'text-destructive'}>{label}</div>
@@ -34,8 +34,8 @@ function CheckRow({ ok, label, detail }: { ok: boolean; label: string; detail: s
 
 const RELAY_STATUS: Record<RelayResult['status'], { label: string; icon: ReactNode }> = {
   pending: { label: 'searching…', icon: <LoaderCircle className="h-3.5 w-3.5 animate-spin text-muted-foreground" /> },
-  found: { label: 'has it', icon: <CircleCheck className="h-3.5 w-3.5 text-green-500" /> },
-  outdated: { label: 'older version', icon: <CircleMinus className="h-3.5 w-3.5 text-yellow-500" /> },
+  found: { label: 'has it', icon: <CircleCheck className="h-3.5 w-3.5 text-ok" /> },
+  outdated: { label: 'older version', icon: <CircleMinus className="h-3.5 w-3.5 text-warn" /> },
   invalid: { label: 'invalid copy', icon: <CircleX className="h-3.5 w-3.5 text-destructive" /> },
   missing: { label: 'not found', icon: <CircleMinus className="h-3.5 w-3.5 text-muted-foreground" /> },
   error: { label: 'unreachable', icon: <CircleX className="h-3.5 w-3.5 text-destructive" /> },
@@ -211,8 +211,8 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
     body = (
       <>
         {newer && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-yellow-500/30 bg-yellow-500/5 px-4 py-3 text-sm">
-            <Info className="h-4 w-4 shrink-0 text-yellow-500" />
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-warn/30 bg-warn/5 px-4 py-3 text-sm">
+            <Info className="h-4 w-4 shrink-0 text-warn" />
             <span key={newer.id} className="min-w-0 flex-1">
               {`A newer version of this event exists (published ${new Date(newer.created_at * 1000).toLocaleString()}).`}
             </span>
@@ -228,7 +228,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
           <Section
             key={`${event.id}-${event.sig}`}
             icon={allPassed
-              ? <CircleCheck className="h-4 w-4 text-green-500" />
+              ? <CircleCheck className="h-4 w-4 text-ok" />
               : <CircleX className="h-4 w-4 text-destructive" />}
             summary={`${allPassed ? 'Verified' : 'Verification failed'} · ${passed} of ${total} checks passed`}
             summaryClassName={allPassed ? undefined : 'text-destructive'}
@@ -286,7 +286,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
                   <span>{kindInfo.description}</span>
                 )}
                 {kindInfo.unrecommended && (
-                  <div className="text-xs text-yellow-500">{`${kindInfo.nip} is unrecommended: ${kindInfo.unrecommended}.`}</div>
+                  <div className="text-xs text-warn">{`${kindInfo.nip} is unrecommended: ${kindInfo.unrecommended}.`}</div>
                 )}
               </dd>
               <dt className="text-muted-foreground">Author</dt>
@@ -307,7 +307,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
           <Section
             icon={isSearching
               ? <LoaderCircle className="h-4 w-4 animate-spin text-muted-foreground" />
-              : <CircleCheck className="h-4 w-4 text-green-500" />}
+              : <CircleCheck className="h-4 w-4 text-ok" />}
             summary={relaysSummary(relays, isSearching)}
           >
             <RelayList relays={relays} />
@@ -322,7 +322,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
               onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
               className="h-8 text-xs gap-1.5"
             >
-              {isCopied ? <Check className="h-3.5 w-3.5 text-green-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {isCopied ? <Check className="h-3.5 w-3.5 text-ok" /> : <Copy className="h-3.5 w-3.5" />}
               <span key={String(isCopied)}>{isCopied ? 'Copied' : 'Copy JSON'}</span>
             </Button>
           </div>
@@ -335,7 +335,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
       <div className="topbar">
         <div className="topbar-inner" style={{ justifyContent: 'flex-start' }}>
           <Link to="/" className="status-pill clickable">

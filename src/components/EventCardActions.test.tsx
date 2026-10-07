@@ -64,8 +64,8 @@ describe('ShareEventButton', () => {
 
     fireEvent.click(first);
 
-    await waitFor(() => expect(first.querySelector('.text-green-500')).not.toBeNull());
-    expect(second.querySelector('.text-green-500')).toBeNull();
+    await waitFor(() => expect(first.querySelector('.text-ok')).not.toBeNull());
+    expect(second.querySelector('.text-ok')).toBeNull();
   });
 });
 
@@ -96,7 +96,7 @@ describe('CopyEventButton', () => {
 
     fireEvent.click(first);
 
-    await waitFor(() => expect(first.querySelector('.text-green-500')).not.toBeNull());
-    expect(second.querySelector('.text-green-500')).toBeNull();
+    await waitFor(() => expect(first.querySelector('.text-ok')).not.toBeNull());
+    expect(second.querySelector('.text-ok')).toBeNull();
   });
 });

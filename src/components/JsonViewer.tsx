@@ -23,7 +23,7 @@ export function JsonViewer({ data, className }: JsonViewerProps) {
           margin: 0,
           fontSize: '12px',
           lineHeight: '1.45',
-          fontFamily: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+          fontFamily: 'var(--font-mono)',
         }}
         codeTagProps={{
           className: 'json-viewer',

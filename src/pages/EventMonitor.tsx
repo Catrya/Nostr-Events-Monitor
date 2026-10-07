@@ -9,9 +9,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
+import { CopyEventButton, ShareEventButton } from '@/components/EventCardActions';
 import { Walkthrough, WALK_STORAGE_KEY } from '@/components/Walkthrough';
-import { Copy, Check, Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
-import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
+import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
 import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
 import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
@@ -93,7 +93,6 @@ export function EventMonitor() {
   const previousFiltersRef = useRef<NostrFilter>({});
   const previousRelaysRef = useRef<string[]>(filters.relays);
   const rateWindowRef = useRef<number[]>([]);
-  const { isCopied, copyToClipboard } = useCopyToClipboard();
 
   // Walkthrough on first visit
   useEffect(() => {
@@ -1347,19 +1346,10 @@ export function EventMonitor() {
                     ))}
                   </div>
                 )}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
-                  className="h-8 w-8 p-0 opacity-50 hover:opacity-100 transition-opacity duration-200 bg-background/80 border border-border/50 rounded-full shadow-sm shrink-0"
-                  aria-label="Copy event to clipboard"
-                >
-                  {isCopied ? (
-                    <Check className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <Copy className="h-4 w-4" />
-                  )}
-                </Button>
+                <div className="ml-auto flex shrink-0 gap-1.5">
+                  <ShareEventButton event={event} relays={event.relayUrls} />
+                  <CopyEventButton event={event} />
+                </div>
               </div>
               <CardContent className="p-4 pt-2" translate="no">
                 <JsonViewer data={event} />

@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import { useSeoMeta } from '@unhead/react';
-import { kinds, nip19 } from 'nostr-tools';
+import { nip19 } from 'nostr-tools';
 import { ArrowLeft, Check, ChevronDown, CircleCheck, CircleMinus, CircleX, Copy, Info, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,8 +13,8 @@ import { useEventById, type RelayResult } from '@/hooks/useEventById';
 import { useAddressableEvent } from '@/hooks/useAddressableEvent';
 import { getKindInfo } from '@/data/kindInfo';
 import { parseAddressRef, parseEventRef, type AddressRef } from '@/lib/eventRef';
+import { addressPath, eventAddress, identifierOf, isVersioned } from '@/lib/eventLinks';
 import { isNewer } from '@/lib/pickEvent';
-import type { NostrEvent } from '@nostrify/nostrify';
 import type { EventVerification } from '@/lib/verifyEvent';
 import { cn } from '@/lib/utils';
 
@@ -88,20 +88,6 @@ function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
   return isSearching ? `${foundText} · checking ${relays.length}…` : `${foundText} · ${relays.length} checked`;
 }
 
-function isVersioned(kind: number): boolean {
-  return kinds.isAddressableKind(kind) || kinds.isReplaceableKind(kind);
-}
-
-/** The `d` tag of an addressable event; empty for replaceable kinds, which have none. */
-function identifierOf(event: NostrEvent): string {
-  if (!kinds.isAddressableKind(event.kind) || !Array.isArray(event.tags)) return '';
-  return event.tags.find(t => t[0] === 'd')?.[1] ?? '';
-}
-
-/** `kind:pubkey:d` for addressable and replaceable events (NIP-01), undefined otherwise. */
-function eventAddress(event: NostrEvent): string | undefined {
-  return isVersioned(event.kind) ? `${event.kind}:${event.pubkey}:${identifierOf(event)}` : undefined;
-}
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -227,7 +213,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
               {`A newer version of this event exists (published ${new Date(newer.created_at * 1000).toLocaleString()}).`}
             </span>
             <Link
-              to={`/a/${nip19.naddrEncode({ kind: newer.kind, pubkey: newer.pubkey, identifier: identifierOf(newer), relays: eventRef?.relays })}`}
+              to={addressPath(newer, eventRef?.relays)}
               className="shrink-0 text-accent hover:underline"
             >
               View latest →

@@ -1260,7 +1260,7 @@ export function EventMonitor() {
                     Event kind <strong>{kind}</strong>:{' '}
                     {info.link ? (
                       <a href={info.link} target="_blank" rel="noopener noreferrer">
-                        {info.nip} {info.description}
+                        {info.nip ? `${info.nip} ${info.description}` : info.description}
                       </a>
                     ) : (
                       <span>{info.description}</span>

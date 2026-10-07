@@ -119,4 +119,11 @@ describe('EventMonitor shared search', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?relays=relay.mostro.network&kinds=38383`));
     expect(await screen.findByText('Link copied')).toBeInTheDocument();
   });
+
+  it('describes a kind without a NIP by its description only', () => {
+    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    renderAt('/?relays=kindinfo.example.com&kinds=25050&mode=stream');
+
+    expect(screen.getByRole('link', { name: 'Call Offer' })).toBeInTheDocument();
+  });
 });

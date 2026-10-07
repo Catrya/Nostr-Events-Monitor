@@ -280,7 +280,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
                 {' · '}
                 {kindInfo.link ? (
                   <a href={kindInfo.link} target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
-                    {`${kindInfo.nip} ${kindInfo.description}`}
+                    {kindInfo.nip ? `${kindInfo.nip} ${kindInfo.description}` : kindInfo.description}
                   </a>
                 ) : (
                   <span>{kindInfo.description}</span>

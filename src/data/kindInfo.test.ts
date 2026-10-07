@@ -32,6 +32,20 @@ describe('getKindInfo', () => {
   });
 });
 
+describe('kinds from the kinds registry', () => {
+  const REGISTRY = 'https://github.com/nostr-protocol/registry-of-kinds/blob/master/schema.yaml';
+
+  it('describes kinds that have no NIP, linking to the registry', () => {
+    expect(getKindInfo(25050)).toMatchObject({ nip: '', description: 'Call Offer', link: REGISTRY, classification: 'ephemeral' });
+    expect(getKindInfo(1064)).toMatchObject({ nip: '', description: 'Blob Data (NIP-95)', link: REGISTRY });
+  });
+
+  it('links a registry kind to its NIP or spec when the registry names one', () => {
+    expect(getKindInfo(30385)).toMatchObject({ nip: 'NIP-85', description: 'External ID Assertion' });
+    expect(getKindInfo(36820)).toMatchObject({ nip: 'Hitchhiking Data Standard', description: 'Hitchhiking Ride', link: 'https://github.com/Hitchwiki/hitchhiking-data-standard' });
+  });
+});
+
 describe('getKindsForNip', () => {
   it('finds the kinds of a new NIP', () => {
     expect(getKindsForNip('CC')).toEqual([7516, 7517, 37516, 37517]);

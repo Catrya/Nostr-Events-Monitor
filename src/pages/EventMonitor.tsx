@@ -1423,7 +1423,7 @@ export function EventMonitor() {
             </a>
           </p>
           <a
-            href="https://github.com/Catrya/Nostr-Events-Monitor"
+            href="https://github.com/Catrya/nostr-inspect"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-primary hover:text-primary/80 transition-colors duration-200"

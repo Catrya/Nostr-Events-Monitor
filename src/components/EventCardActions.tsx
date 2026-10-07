@@ -30,7 +30,7 @@ function ShareOption({ title, detail }: { title: string; detail: string }) {
 export function ShareEventButton({ event, relays }: { event: NostrEvent; relays: string[] }) {
   const { isCopied, copyToClipboard } = useCopyToClipboard();
   const copy = (path: string) => copyToClipboard(window.location.origin + path);
-  const icon = isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Link2 className="h-4 w-4" />;
+  const icon = isCopied ? <Check className="h-4 w-4 text-ok" /> : <Link2 className="h-4 w-4" />;
 
   if (!isVersioned(event.kind)) {
     return (
@@ -77,7 +77,7 @@ export function CopyEventButton({ event }: { event: NostrEvent }) {
       className={cardButtonClass}
       aria-label="Copy event to clipboard"
     >
-      {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+      {isCopied ? <Check className="h-4 w-4 text-ok" /> : <Copy className="h-4 w-4" />}
     </Button>
   );
 }

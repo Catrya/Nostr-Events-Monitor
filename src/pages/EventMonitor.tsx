@@ -641,7 +641,7 @@ export function EventMonitor() {
     : `(${displayEvents.length})`;
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen text-foreground">
       {walkOpen && <Walkthrough onClose={closeWalkthrough} />}
 
       {/* TOPBAR */}
@@ -674,7 +674,7 @@ export function EventMonitor() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 space-y-4">
-        <Card className="panel-corner border-accent/20 bg-card/50 backdrop-blur-sm">
+        <Card className="panel-corner border-accent/20 bg-card/50">
           <CardContent className="p-4 pt-4">
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Mode + Query-by segmented controls */}
@@ -1184,7 +1184,7 @@ export function EventMonitor() {
                     <Link2 className="h-3.5 w-3.5" />
                     Share search
                   </Button>
-                  <span key={String(isSearchCopied)} className={`text-[10px] ${isSearchCopied ? 'text-green-500' : 'text-muted-foreground'}`}>
+                  <span key={String(isSearchCopied)} className={`text-[10px] ${isSearchCopied ? 'text-ok' : 'text-muted-foreground'}`}>
                     {isSearchCopied ? 'Link copied' : 'Copy link'}
                   </span>
                 </div>
@@ -1247,7 +1247,7 @@ export function EventMonitor() {
           {displayEvents.length > 0 && relayStats.size > 0 && (
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               {Array.from(relayStats.entries()).map(([relay, count]) => (
-                <Badge key={relay} variant="outline" className="text-xs" translate="no">
+                <Badge key={relay} variant="outline" className="font-mono text-[11px] font-normal rounded-lg border-accent/25 bg-card/60 text-muted-foreground" translate="no">
                   {`${relay.replace('wss://', '').replace('ws://', '')}: ${count} event${count !== 1 ? 's' : ''}`}
                 </Badge>
               ))}
@@ -1273,7 +1273,7 @@ export function EventMonitor() {
                     {info.unrecommended && (
                       <span>
                         {' · '}
-                        <span className="text-yellow-500" title={`${info.nip} is unrecommended: ${info.unrecommended}`}>unrecommended</span>
+                        <span className="text-warn" title={`${info.nip} is unrecommended: ${info.unrecommended}`}>unrecommended</span>
                       </span>
                     )}
                     {' · '}
@@ -1406,7 +1406,7 @@ export function EventMonitor() {
                         key={url}
                         translate="no"
                         variant="secondary"
-                        className="text-xs bg-accent/20 border-accent/40"
+                        className="font-mono text-[11px] font-medium rounded-lg bg-accent/15 border-accent/30 text-[var(--c-accent-glow)]"
                       >
                         {url.replace('wss://', '').replace('ws://', '')}
                       </Badge>

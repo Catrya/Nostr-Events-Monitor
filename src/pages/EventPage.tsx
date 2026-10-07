@@ -129,10 +129,10 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
 
   useSeoMeta({
     title: eventRef
-      ? `Event ${eventRef.id.slice(0, 8)}… | Nostr Event Monitor`
+      ? `Event ${eventRef.id.slice(0, 8)}… | Nostr Inspect`
       : addressRef
-        ? `Event ${addressRef.kind}:${addressRef.identifier.slice(0, 8)} | Nostr Event Monitor`
-        : 'Event | Nostr Event Monitor',
+        ? `Event ${addressRef.kind}:${addressRef.identifier.slice(0, 8)} | Nostr Inspect`
+        : 'Event | Nostr Inspect',
     description: 'Inspect and verify a Nostr event: signature, id, relays and raw JSON.',
   });
 
@@ -333,7 +333,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
         <div className="topbar-inner" style={{ justifyContent: 'flex-start' }}>
           <Link to="/" className="status-pill clickable">
             <ArrowLeft className="h-3 w-3" />
-            <span>Nostr Event Monitor</span>
+            <span>Nostr Inspect</span>
           </Link>
         </div>
       </div>

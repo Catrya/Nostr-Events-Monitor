@@ -106,7 +106,7 @@
   padding: 12px 24px;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
 }
@@ -116,38 +116,22 @@
   gap: 10px;
   font-size: 13px;
   letter-spacing: 0.02em;
+  color: inherit;
+  text-decoration: none;
 }
-.brand-glyph {
+.brand-logo {
   width: 26px;
   height: 26px;
-  border: 1px solid var(--c-accent);
-  display: grid;
-  place-items: center;
-  background: linear-gradient(135deg, rgba(176, 154, 217, 0.18), transparent);
-  position: relative;
-  color: var(--c-accent-glow);
-  font-weight: 700;
-  font-size: 12px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-.brand-glyph::before {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border: 1px solid rgba(176, 154, 217, 0.45);
-  pointer-events: none;
+  border-radius: 6px;
+  flex-shrink: 0;
 }
 .brand-name {
   font-weight: 600;
   color: var(--c-text);
   line-height: 1.2;
 }
-.brand-tag {
-  color: var(--c-text-mute);
-  font-size: 10px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
 .topbar-right {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;

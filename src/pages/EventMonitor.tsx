@@ -642,6 +642,10 @@ export function EventMonitor() {
       {/* TOPBAR */}
       <div className="topbar">
         <div className="topbar-inner">
+          <a href="/" className="brand" aria-label="Nostr Inspect home">
+            <img src="/favicon.svg" alt="" width={26} height={26} className="brand-logo" />
+            <span className="brand-name">Nostr Inspect</span>
+          </a>
           <div className="topbar-right">
             <span className="status-pill">
               <span className={`led ${validRelays.length > 0 ? 'on' : 'off'}`} />
@@ -1423,7 +1427,7 @@ export function EventMonitor() {
             </a>
           </p>
           <a
-            href="https://github.com/Catrya/Nostr-Events-Monitor"
+            href="https://github.com/Catrya/nostr-inspect"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-block text-primary hover:text-primary/80 transition-colors duration-200"

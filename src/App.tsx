@@ -46,9 +46,9 @@ export function App() {
   return (
     <div className="dark">
       <UnheadProvider head={head}>
-        <AppProvider storageKey="nostr:app-config" defaultConfig={defaultConfig} presetRelays={presetRelays}>
+        <AppProvider storageKey="nostr-inspect:app-config" defaultConfig={defaultConfig} presetRelays={presetRelays}>
           <QueryClientProvider client={queryClient}>
-            <NostrLoginProvider storageKey='nostr:login'>
+            <NostrLoginProvider storageKey='nostr-inspect:login'>
               <NostrProvider>
                 <TooltipProvider>
                   <Toaster />

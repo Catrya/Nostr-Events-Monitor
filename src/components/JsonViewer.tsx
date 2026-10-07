@@ -1,5 +1,9 @@
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { PrismLight as SyntaxHighlighter } from 'react-syntax-highlighter';
+import json from 'react-syntax-highlighter/dist/esm/languages/prism/json';
 import { cn } from '@/lib/utils';
+
+// Only JSON is ever highlighted: the full build bundles every Prism language
+SyntaxHighlighter.registerLanguage('json', json);
 
 interface JsonViewerProps {
   data: object;

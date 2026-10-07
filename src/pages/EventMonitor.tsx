@@ -15,6 +15,7 @@ import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
 import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
 import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
+import { parseTagFilter } from '@/lib/searchParams';
 
 interface EventFilters {
   relays: string[];
@@ -144,8 +145,9 @@ export function EventMonitor() {
 
     const validTags = filters.tags.filter(t => t.trim() !== '');
     for (const tag of validTags) {
-      const [tagName, tagValue] = tag.split(':').map(s => s.trim());
-      if (tagName && tagValue) {
+      const parsed = parseTagFilter(tag);
+      if (parsed) {
+        const [tagName, tagValue] = parsed;
         const filterKey = `#${tagName}` as keyof NostrFilter;
         const existing = qf[filterKey] as string[] | undefined;
         qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;
@@ -199,8 +201,9 @@ export function EventMonitor() {
 
       const validTags = filters.tags.filter(t => t.trim() !== '');
       for (const tag of validTags) {
-        const [tagName, tagValue] = tag.split(':').map(s => s.trim());
-        if (tagName && tagValue) {
+        const parsed = parseTagFilter(tag);
+        if (parsed) {
+          const [tagName, tagValue] = parsed;
           const filterKey = `#${tagName}` as keyof NostrFilter;
           const existing = qf[filterKey] as string[] | undefined;
           qf[filterKey] = (existing ? [...existing, tagValue] : [tagValue]) as never;

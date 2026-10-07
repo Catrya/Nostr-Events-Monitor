@@ -1,6 +1,6 @@
 import { useMemo, type ReactNode } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
-import { useSeoMeta } from '@unhead/react';
+import { useHead, useSeoMeta } from '@unhead/react';
 import { nip19 } from 'nostr-tools';
 import { ArrowLeft, Check, ChevronDown, CircleCheck, CircleMinus, CircleX, Copy, Info, LoaderCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -134,7 +134,11 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
         ? `Event ${addressRef.kind}:${addressRef.identifier.slice(0, 8)} | Nostr Inspect`
         : 'Event | Nostr Inspect',
     description: 'Inspect and verify a Nostr event: signature, id, relays and raw JSON.',
+    // Thousands of single-event pages: keep them out of search results, the home page is what should rank
+    robots: 'noindex',
   });
+  // The HTML shell's canonical points to the home page; an event page is its own page, not a copy of it
+  useHead({ link: [{ rel: 'canonical', href: `https://nostrinspect.com/${mode === 'id' ? 'e' : 'a'}/${param}` }] });
 
   // A link pasted under the wrong prefix goes to the right page
   if (mode === 'id' && !eventParsed.ok && addressParsed.ok) return <Navigate to={`/a/${param}`} replace />;

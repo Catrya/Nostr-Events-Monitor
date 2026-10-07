@@ -642,6 +642,10 @@ export function EventMonitor() {
       {/* TOPBAR */}
       <div className="topbar">
         <div className="topbar-inner">
+          <a href="/" className="brand" aria-label="Nostr Inspect home">
+            <img src="/favicon.svg" alt="" width={26} height={26} className="brand-logo" />
+            <span className="brand-name">Nostr Inspect</span>
+          </a>
           <div className="topbar-right">
             <span className="status-pill">
               <span className={`led ${validRelays.length > 0 ? 'on' : 'off'}`} />

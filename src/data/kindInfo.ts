@@ -6,6 +6,8 @@ interface KindEntry {
 
 interface KindInfo extends KindEntry {
   classification: string;
+  /** Why the kind's NIP is marked unrecommended in the NIPs repository, if it is. */
+  unrecommended?: string;
 }
 
 const NIP_BASE = 'https://github.com/nostr-protocol/nips/blob/master/';
@@ -17,21 +19,22 @@ function nipLink(nip: string): string {
 }
 
 // All known NIPs with their file identifiers
-const VALID_NIPS: Record<string, { name: string; file: string }> = {
+// `unrecommended` is the reason given in the NIPs repository README
+const VALID_NIPS: Record<string, { name: string; file: string; unrecommended?: string }> = {
   '01': { name: 'Basic protocol flow description', file: '01' },
   '02': { name: 'Follow List', file: '02' },
-  '03': { name: 'OpenTimestamps Attestations for Events', file: '03' },
-  '04': { name: 'Encrypted Direct Message', file: '04' },
+  '03': { name: 'OpenTimestamps Attestations for Events', file: '03', unrecommended: 'vulnerable to one specific attack, needs update' },
+  '04': { name: 'Encrypted Direct Message', file: '04', unrecommended: 'deprecated in favor of NIP-17' },
   '05': { name: 'Mapping Nostr keys to DNS-based internet identifiers', file: '05' },
-  '06': { name: 'Basic key derivation from mnemonic seed phrase', file: '06' },
+  '06': { name: 'Basic key derivation from mnemonic seed phrase', file: '06', unrecommended: 'prefer a single nsec' },
   '07': { name: 'window.nostr capability for web browsers', file: '07' },
-  '08': { name: 'Handling Mentions', file: '08' },
+  '08': { name: 'Handling Mentions', file: '08', unrecommended: 'deprecated in favor of NIP-27' },
   '09': { name: 'Event Deletion Request', file: '09' },
   '10': { name: 'Text Notes and Threads', file: '10' },
   '11': { name: 'Relay Information Document', file: '11' },
   '13': { name: 'Proof of Work', file: '13' },
   '14': { name: 'Subject tag in text events', file: '14' },
-  '15': { name: 'Nostr Marketplace (for resilient marketplaces)', file: '15' },
+  '15': { name: 'Nostr Marketplace (for resilient marketplaces)', file: '15', unrecommended: 'too complicated, try NIP-99 instead' },
   '17': { name: 'Private Direct Messages', file: '17' },
   '18': { name: 'Reposts', file: '18' },
   '19': { name: 'bech32-encoded entities', file: '19' },
@@ -40,12 +43,12 @@ const VALID_NIPS: Record<string, { name: string; file: string }> = {
   '23': { name: 'Long-form Content', file: '23' },
   '24': { name: 'Extra metadata fields and tags', file: '24' },
   '25': { name: 'Reactions', file: '25' },
-  '26': { name: 'Delegated Event Signing', file: '26' },
+  '26': { name: 'Delegated Event Signing', file: '26', unrecommended: 'adds unnecessary burden for little gain' },
   '27': { name: 'Text Note References', file: '27' },
-  '28': { name: 'Public Chat', file: '28' },
+  '28': { name: 'Public Chat', file: '28', unrecommended: 'try NIP-29 instead' },
   '29': { name: 'Relay-based Groups', file: '29' },
   '30': { name: 'Custom Emoji', file: '30' },
-  '31': { name: 'Dealing with Unknown Events', file: '31' },
+  '31': { name: 'Dealing with Unknown Events', file: '31', unrecommended: 'unnecessarily bloated' },
   '32': { name: 'Labeling', file: '32' },
   '34': { name: 'git stuff', file: '34' },
   '35': { name: 'Torrents', file: '35' },
@@ -84,7 +87,7 @@ const VALID_NIPS: Record<string, { name: string; file: string }> = {
   '69': { name: 'Peer-to-peer Order events', file: '69' },
   '70': { name: 'Protected Events', file: '70' },
   '71': { name: 'Video Events', file: '71' },
-  '72': { name: 'Moderated Communities', file: '72' },
+  '72': { name: 'Moderated Communities', file: '72', unrecommended: 'try NIP-29 instead' },
   '73': { name: 'External Content IDs', file: '73' },
   '75': { name: 'Zap Goals', file: '75' },
   '77': { name: 'Negentropy Syncing', file: '77' },
@@ -96,10 +99,10 @@ const VALID_NIPS: Record<string, { name: string; file: string }> = {
   '87': { name: 'Cashu and Fedimint Discoverability', file: '87' },
   '88': { name: 'Polls', file: '88' },
   '89': { name: 'Recommended Application Handlers', file: '89' },
-  '90': { name: 'Data Vending Machines', file: '90' },
+  '90': { name: 'Data Vending Machines', file: '90', unrecommended: 'this got totally out of control, prefer use-case-specific microstandards' },
   '92': { name: 'Media Attachments Metadata (imeta)', file: '92' },
   '94': { name: 'File Metadata', file: '94' },
-  '96': { name: 'HTTP File Storage Integration', file: '96' },
+  '96': { name: 'HTTP File Storage Integration', file: '96', unrecommended: 'replaced by Blossom' },
   '98': { name: 'HTTP Auth', file: '98' },
   '99': { name: 'Classified Listings', file: '99' },
   'A0': { name: 'Voice Messages', file: 'A0' },
@@ -107,11 +110,11 @@ const VALID_NIPS: Record<string, { name: string; file: string }> = {
   'A4': { name: 'Public Messages', file: 'A4' },
   'B0': { name: 'Web Bookmarks', file: 'B0' },
   'B7': { name: 'Blossom', file: 'B7' },
-  'BE': { name: 'Nostr BLE Communications Protocol', file: 'BE' },
+  'BE': { name: 'Nostr BLE Communications Protocol', file: 'BE', unrecommended: 'only implemented once and unclear whether it works, requires review' },
   'C0': { name: 'Code Snippets', file: 'C0' },
   'C7': { name: 'Chats', file: 'C7' },
   'CC': { name: 'Geocaching', file: 'CC' },
-  'EE': { name: 'E2EE Messaging using MLS Protocol', file: 'EE' },
+  'EE': { name: 'E2EE Messaging using MLS Protocol', file: 'EE', unrecommended: 'superseded by the Marmot Protocol' },
   'F4': { name: 'Podcasts', file: 'F4' },
 };
 
@@ -122,11 +125,17 @@ function normalizeNipId(nipId: string): string {
   return cleaned;
 }
 
-export function getNipInfo(nipId: string): { exists: boolean; name: string; link: string } | null {
+export function getNipInfo(nipId: string): { exists: boolean; name: string; link: string; unrecommended?: string } | null {
   const normalized = normalizeNipId(nipId);
   const nip = VALID_NIPS[normalized];
   if (!nip) return null;
-  return { exists: true, name: nip.name, link: nipLink(nip.file) };
+  return { exists: true, name: nip.name, link: nipLink(nip.file), ...(nip.unrecommended ? { unrecommended: nip.unrecommended } : {}) };
+}
+
+/** The unrecommended reason of an entry's NIP (`NIP-04` → its reason); undefined for other specs. */
+function unrecommendedReason(nip: string): string | undefined {
+  const code = nip.match(/^NIP-([0-9A-F]{2})$/)?.[1];
+  return code ? VALID_NIPS[code]?.unrecommended : undefined;
 }
 
 const KIND_MAP: Record<number, KindEntry> = {
@@ -456,19 +465,19 @@ export function getKindsForNip(nipId: string): number[] {
 export function getKindInfo(kind: number): KindInfo {
   const classification = getKindClassification(kind);
 
+  const withReason = (entry: KindEntry): KindInfo => {
+    const unrecommended = unrecommendedReason(entry.nip);
+    return { ...entry, classification, ...(unrecommended ? { unrecommended } : {}) };
+  };
+
   const direct = KIND_MAP[kind];
   if (direct) {
-    return { ...direct, classification };
+    return withReason(direct);
   }
 
   const range = KIND_RANGES.find(r => kind >= r.min && kind <= r.max);
   if (range) {
-    return {
-      nip: range.nip,
-      description: range.description,
-      link: range.link,
-      classification,
-    };
+    return withReason({ nip: range.nip, description: range.description, link: range.link });
   }
 
   return {

@@ -442,6 +442,7 @@ export function EventMonitor() {
 
     const notFound: string[] = [];
     const noKinds: string[] = [];
+    const unrecommended: string[] = [];
     const allKinds: number[] = [];
 
     for (const n of validNips) {
@@ -449,6 +450,10 @@ export function EventMonitor() {
       if (!nipInfo) {
         notFound.push(n.trim());
         continue;
+      }
+      if (nipInfo.unrecommended) {
+        const code = n.trim().replace(/^nip-?/i, '').toUpperCase().padStart(2, '0');
+        unrecommended.push(`NIP-${code} is unrecommended: ${nipInfo.unrecommended}.`);
       }
       const kinds = getKindsForNip(n.trim());
       if (kinds.length === 0) {
@@ -478,11 +483,11 @@ export function EventMonitor() {
       return null;
     }
 
-    if (noKinds.length > 0) {
-      setNipMessage(`NIP-${noKinds.join(', NIP-')} — no associated event kinds. Searching remaining NIPs.`);
-    } else {
-      setNipMessage(null);
-    }
+    const messages = [
+      ...(noKinds.length > 0 ? [`NIP-${noKinds.join(', NIP-')} — no associated event kinds. Searching remaining NIPs.`] : []),
+      ...unrecommended,
+    ];
+    setNipMessage(messages.length > 0 ? messages.join(' ') : null);
 
     nipActiveRef.current = true;
     setNipKinds(allKinds);
@@ -1264,6 +1269,12 @@ export function EventMonitor() {
                       </a>
                     ) : (
                       <span>{info.description}</span>
+                    )}
+                    {info.unrecommended && (
+                      <span>
+                        {' · '}
+                        <span className="text-yellow-500" title={`${info.nip} is unrecommended: ${info.unrecommended}`}>unrecommended</span>
+                      </span>
                     )}
                     {' · '}
                     <a

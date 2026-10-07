@@ -285,6 +285,9 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
                 ) : (
                   <span>{kindInfo.description}</span>
                 )}
+                {kindInfo.unrecommended && (
+                  <div className="text-xs text-yellow-500">{`${kindInfo.nip} is unrecommended: ${kindInfo.unrecommended}.`}</div>
+                )}
               </dd>
               <dt className="text-muted-foreground">Author</dt>
               <dd translate="no" className="font-mono text-xs break-all">{nip19.npubEncode(event.pubkey)}</dd>

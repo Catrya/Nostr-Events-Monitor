@@ -52,3 +52,18 @@ describe('getKindsForNip', () => {
     expect(getKindsForNip('F4')).toEqual([54, 10154]);
   });
 });
+
+describe('unrecommended NIPs', () => {
+  it('gives the reason from the NIPs repository', () => {
+    expect(getNipInfo('04')?.unrecommended).toBe('deprecated in favor of NIP-17');
+    expect(getNipInfo('EE')?.unrecommended).toBe('superseded by the Marmot Protocol');
+    expect(getNipInfo('01')).not.toHaveProperty('unrecommended');
+  });
+
+  it('flags kinds whose NIP is unrecommended, including kind ranges', () => {
+    expect(getKindInfo(4).unrecommended).toBe('deprecated in favor of NIP-17');
+    expect(getKindInfo(5100)).toMatchObject({ nip: 'NIP-90', unrecommended: expect.stringContaining('microstandards') });
+    expect(getKindInfo(1)).not.toHaveProperty('unrecommended');
+    expect(getKindInfo(25050)).not.toHaveProperty('unrecommended');
+  });
+});

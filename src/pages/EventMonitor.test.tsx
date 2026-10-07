@@ -126,4 +126,17 @@ describe('EventMonitor shared search', () => {
 
     expect(screen.getByRole('link', { name: 'Call Offer' })).toBeInTheDocument();
   });
+
+  it('marks the kind of an unrecommended NIP', () => {
+    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    renderAt('/?relays=unrec.example.com&kinds=4&mode=stream');
+
+    expect(screen.getByText('unrecommended')).toHaveAttribute('title', 'NIP-04 is unrecommended: deprecated in favor of NIP-17');
+  });
+
+  it('warns when searching an unrecommended NIP', async () => {
+    renderAt('/?relays=nipwarn.example.com&nips=4');
+
+    expect(await screen.findByText('NIP-04 is unrecommended: deprecated in favor of NIP-17.')).toBeInTheDocument();
+  });
 });

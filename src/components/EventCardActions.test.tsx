@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { nip19 } from 'nostr-tools';
 import type { NostrEvent } from '@nostrify/nostrify';
-import { ShareEventButton } from './EventCardActions';
+import { CopyEventButton, ShareEventButton } from './EventCardActions';
 
 const AUTHOR = '00000235a3e904cfe1213a8a54d6f1ec1bef7cc6bfaabd6193e82931ccf1366a';
 const RELAYS = ['wss://relay.mostro.network', 'wss://nos.lol'];
@@ -61,6 +61,38 @@ describe('ShareEventButton', () => {
       </>
     );
     const [first, second] = screen.getAllByRole('button', { name: 'Copy link to event' });
+
+    fireEvent.click(first);
+
+    await waitFor(() => expect(first.querySelector('.text-green-500')).not.toBeNull());
+    expect(second.querySelector('.text-green-500')).toBeNull();
+  });
+});
+
+describe('CopyEventButton', () => {
+  beforeEach(() => {
+    writeText.mockReset().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+  });
+
+  it('copies the event JSON', async () => {
+    const event = ev(1);
+    render(<CopyEventButton event={event} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Copy event to clipboard' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(JSON.stringify(event, null, 2)));
+  });
+
+  it('shows the copied state only on the card that was copied', async () => {
+    render(
+      <>
+        <CopyEventButton event={ev(1)} />
+        <CopyEventButton event={ev(1)} />
+      </>
+    );
+    const [first, second] = screen.getAllByRole('button', { name: 'Copy event to clipboard' });
 
     fireEvent.click(first);
 

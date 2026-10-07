@@ -1,5 +1,5 @@
 import type { NostrEvent } from '@nostrify/nostrify';
-import { Check, Link2 } from 'lucide-react';
+import { Check, Copy, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -62,5 +62,22 @@ export function ShareEventButton({ event, relays }: { event: NostrEvent; relays:
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** Copies the event JSON. Each card has its own copied state. */
+export function CopyEventButton({ event }: { event: NostrEvent }) {
+  const { isCopied, copyToClipboard } = useCopyToClipboard();
+
+  return (
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => copyToClipboard(JSON.stringify(event, null, 2))}
+      className={cardButtonClass}
+      aria-label="Copy event to clipboard"
+    >
+      {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <Copy className="h-4 w-4" />}
+    </Button>
   );
 }

@@ -104,4 +104,19 @@ describe('EventMonitor shared search', () => {
 
     await waitFor(() => expect(window.location.search).toBe('?relays=clear.example.com'));
   });
+
+  it('copies a link to the search in the form, before running it', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
+    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    renderAt('/');
+
+    fireEvent.change(screen.getByPlaceholderText('relay.damus.io or wss://relay.damus.io'), { target: { value: 'relay.mostro.network' } });
+    fireEvent.change(screen.getByPlaceholderText('leave empty for all kinds'), { target: { value: '38383' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Share search' }));
+
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/?relays=relay.mostro.network&kinds=38383`));
+    expect(await screen.findByText('Link copied')).toBeInTheDocument();
+  });
 });

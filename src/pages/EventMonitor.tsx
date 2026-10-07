@@ -12,7 +12,8 @@ import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { CopyEventButton, ShareEventButton } from '@/components/EventCardActions';
 import { Walkthrough, WALK_STORAGE_KEY } from '@/components/Walkthrough';
-import { Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
 import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
 import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
@@ -421,6 +422,11 @@ export function EventMonitor() {
     () => searchToQuery({ ...filters, nips: nipFilter, mode, queryType }),
     [filters, nipFilter, mode, queryType],
   );
+
+  const { isCopied: isSearchCopied, copyToClipboard } = useCopyToClipboard();
+  const shareSearch = useCallback(() => {
+    copyToClipboard(`${window.location.origin}/${searchQuery ? `?${searchQuery}` : ''}`);
+  }, [copyToClipboard, searchQuery]);
 
   // Keeps the address bar on the last search, so a reload or a copied URL brings it back
   const syncUrl = useCallback((query: string) => {
@@ -1158,6 +1164,20 @@ export function EventMonitor() {
                     Clear Filters
                   </Button>
                   <span className="text-[10px] text-muted-foreground">&nbsp;</span>
+                </div>
+                <div className="flex flex-col items-center gap-0.5">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={shareSearch}
+                    className="h-8 px-4 text-xs gap-1.5 bg-accent/10 border-accent/30 hover:bg-accent/20"
+                  >
+                    <Link2 className="h-3.5 w-3.5" />
+                    Share search
+                  </Button>
+                  <span key={String(isSearchCopied)} className={`text-[10px] ${isSearchCopied ? 'text-green-500' : 'text-muted-foreground'}`}>
+                    {isSearchCopied ? 'Link copied' : 'Copy link'}
+                  </span>
                 </div>
 
                 <div className="ml-auto flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">

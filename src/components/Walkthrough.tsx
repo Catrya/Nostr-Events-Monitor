@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export const WALK_STORAGE_KEY = 'nem-walk-seen';
+export const WALK_STORAGE_KEY = 'nostr-inspect:walk-seen';
 
 interface WalkthroughProps {
   onClose: () => void;

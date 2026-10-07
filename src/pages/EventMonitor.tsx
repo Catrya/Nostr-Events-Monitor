@@ -644,7 +644,7 @@ export function EventMonitor() {
         <div className="topbar-inner">
           <a href="/" className="brand" aria-label="Nostr Inspect home">
             <img src="/favicon.svg" alt="" width={26} height={26} className="brand-logo" />
-            <span className="brand-name">Nostr Inspect</span>
+            <h1 className="brand-name">Nostr Inspect</h1>
           </a>
           <div className="topbar-right">
             <span className="status-pill">

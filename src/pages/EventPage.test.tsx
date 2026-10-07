@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { Route, Routes } from 'react-router-dom';
 import { nip19 } from 'nostr-tools';
 import type { NostrEvent } from '@nostrify/nostrify';
@@ -46,6 +46,14 @@ describe('EventPage', () => {
   beforeEach(() => {
     vi.mocked(useEventById).mockReset();
     vi.mocked(useAddressableEvent).mockReset();
+  });
+
+  it('keeps event pages out of search results, with their own canonical URL', async () => {
+    const note = nip19.noteEncode(ID);
+    renderAt(`/e/${note}`);
+
+    await waitFor(() => expect(document.querySelector('meta[name="robots"]')?.getAttribute('content')).toBe('noindex'));
+    expect(document.querySelector('link[rel="canonical"]')?.getAttribute('href')).toBe(`https://nostrinspect.com/e/${note}`);
   });
 
   it('passes the parsed reference to the lookup', () => {

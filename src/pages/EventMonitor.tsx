@@ -12,10 +12,10 @@ import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { CopyEventButton, ShareEventButton } from '@/components/EventCardActions';
 import { GuidedTour, TOUR_STORAGE_KEY, type TourStep } from '@/components/GuidedTour';
-import { Plus, X, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
+import { Plus, X, ChevronDown, ChevronUp, Link2, Dices } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
-import { SUGGESTED_RELAYS, PRESETS, QueryPreset } from '@/data/presets';
+import { SUGGESTED_RELAYS, PRESETS, QueryPreset, pickRandomQuery } from '@/data/presets';
 import { normalizeRelayUrl, isValidWebSocketUrl } from '@/lib/relays';
 import { parseTagFilter, queryToSearch, searchToQuery } from '@/lib/searchParams';
 
@@ -96,7 +96,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'quickstart',
     title: 'Not sure what to look for?',
-    body: 'Start with any of these: add a popular relay, then pick a preset to see real events right away.',
+    body: 'Start with any of these: add a popular relay, then pick a preset to see real events right away. Or try Random query, which picks the relays and filters for you.',
   },
 ];
 
@@ -670,6 +670,51 @@ export function EventMonitor() {
     setKindsExpanded(false);
   }, []);
 
+  // Random query: fills the form with a kind (and maybe a topic) known to return events, then searches
+  const lastRandomKindRef = useRef<string | undefined>(undefined);
+  // The relays the last random query set, and the visitor's own relays it started from
+  const lastRandomRelaysRef = useRef<{ relays: string[]; visitorRelays: string[] } | null>(null);
+  const randomSearchPendingRef = useRef(false);
+  const applyRandomQuery = useCallback(() => {
+    const q = pickRandomQuery(lastRandomKindRef.current);
+    lastRandomKindRef.current = q.kind;
+
+    // Relays left as the last random query set them are swapped for new ones; the visitor's own are kept,
+    // with ours added only when there are none, or when the kind lives on one relay
+    const current = filters.relays.filter(r => isValidWebSocketUrl(r)).map(r => normalizeRelayUrl(r));
+    const last = lastRandomRelaysRef.current;
+    const visitorRelays = last && current.join() === last.relays.join() ? last.visitorRelays : current;
+    const wanted = q.relays.map(r => `wss://${r}`);
+    let relays = visitorRelays;
+    if (visitorRelays.length === 0) {
+      relays = wanted;
+    } else if (wanted.length === 1 && !visitorRelays.includes(wanted[0])) {
+      relays = [...visitorRelays, wanted[0]];
+    }
+    lastRandomRelaysRef.current = { relays, visitorRelays };
+
+    setIsStreaming(false);
+    setMode('search');
+    setQueryType('kind');
+    nipActiveRef.current = false;
+    setNipFilter(['']);
+    setNipKinds([]);
+    setNipMessage(null);
+    setKindsExpanded(false);
+    setFilters({
+      relays: relays === current ? filters.relays : relays,
+      kinds: [q.kind], limit: '20', authors: [''], since: '', until: '', tags: [q.tag],
+    });
+    randomSearchPendingRef.current = true;
+  }, [filters.relays]);
+
+  // Runs once the random query is in the form, so the search and the shared URL use it
+  useEffect(() => {
+    if (!randomSearchPendingRef.current) return;
+    randomSearchPendingRef.current = false;
+    handleSearch();
+  }, [handleSearch]);
+
   // Popular relays and presets: in the empty state, and shown on demand by the guided tour
   const quickstart = (
     <div className="quickstart" data-tour="quickstart">
@@ -701,6 +746,17 @@ export function EventMonitor() {
             <div className="preset-desc">{p.desc}</div>
           </button>
         ))}
+        <button
+          type="button"
+          className="preset-card preset-random"
+          onClick={applyRandomQuery}
+        >
+          <div className="preset-title">
+            <span className="flex items-center gap-2"><Dices className="h-3.5 w-3.5" />Random query</span>
+            <span className="preset-arrow">→</span>
+          </div>
+          <div className="preset-desc">a random kind on popular free relays, searched right away</div>
+        </button>
       </div>
     </div>
   );
@@ -796,9 +852,16 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div key={queryType} className="ml-auto text-2xs font-mono text-muted-foreground">
-                  {queryType === 'nip' ? 'resolves NIPs → kinds' : 'direct event kind numbers'}
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applyRandomQuery}
+                  disabled={isLoading}
+                  className="ml-auto h-8 px-4 text-xs gap-1.5 bg-accent/10 border-accent/30 hover:bg-accent/20"
+                >
+                  <Dices className="h-3.5 w-3.5" />
+                  Random query
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">

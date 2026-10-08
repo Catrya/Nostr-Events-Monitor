@@ -105,6 +105,69 @@ describe('EventMonitor shared search', () => {
     await waitFor(() => expect(window.location.search).toBe('?relays=clear.example.com'));
   });
 
+  it('runs a random query on free relays when the form has none', async () => {
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    renderAt('/');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    random.mockRestore();
+
+    await waitFor(() => expect(queries.filter(q => q.filters[0].kinds?.[0] === 1)).toHaveLength(2));
+    expect(queries.map(q => q.url).sort()).toEqual(['wss://nos.lol', 'wss://relay.damus.io']);
+    expect(queries[0].filters).toEqual([{ kinds: [1], '#t': ['bitcoin'], limit: 20 }]);
+    expect(window.location.search).toBe('?relays=relay.damus.io,nos.lol&kinds=1&tag=t:bitcoin&limit=20');
+  });
+
+  it('keeps the visitor relays and drops their other filters on a random query', async () => {
+    renderAt('/?relays=random.example.com&kinds=7&since=1&tag=t:art');
+    await waitFor(() => expect(queries.some(q => q.url === 'wss://random.example.com')).toBe(true));
+    queries.length = 0;
+
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    random.mockRestore();
+
+    await waitFor(() => expect(queries.some(q => q.url === 'wss://random.example.com')).toBe(true));
+    expect(queries.map(q => q.url)).toEqual(['wss://random.example.com']);
+    expect(queries[0].filters).toEqual([{ kinds: [1], '#t': ['bitcoin'], limit: 20 }]);
+  });
+
+  it('swaps the relays a previous random query set', async () => {
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
+    renderAt('/');
+    const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    await waitFor(() => expect(queries.filter(q => q.filters[0].kinds?.[0] === 1)).toHaveLength(2));
+    queries.length = 0;
+
+    random.mockReturnValue(0.99);
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    random.mockRestore();
+
+    await waitFor(() => expect(queries.filter(q => q.filters[0].kinds?.[0] === 39089)).toHaveLength(2));
+    expect(queries.map(q => q.url).sort()).toEqual(['wss://nostr-pub.wellorder.net', 'wss://offchain.pub']);
+  });
+
+  it('drops the Mostro relay it added once the next random query does not need it', async () => {
+    renderAt('/?relays=mostro.example.com&kinds=7');
+    await waitFor(() => expect(queries.some(q => q.url === 'wss://mostro.example.com')).toBe(true));
+    queries.length = 0;
+
+    const random = vi.spyOn(Math, 'random').mockReturnValue(11.5 / 13);
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    await waitFor(() => expect(queries.some(q => q.url === 'wss://relay.mostro.network')).toBe(true));
+    expect(queries.map(q => q.url).sort()).toEqual(['wss://mostro.example.com', 'wss://relay.mostro.network']);
+    queries.length = 0;
+
+    random.mockReturnValue(0);
+    fireEvent.click(screen.getByRole('button', { name: 'Random query' }));
+    random.mockRestore();
+
+    await waitFor(() => expect(queries.some(q => q.filters[0].kinds?.[0] === 1)).toBe(true));
+    expect(queries.map(q => q.url)).toEqual(['wss://mostro.example.com']);
+  });
+
   it('copies a link to the search in the form, before running it', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });

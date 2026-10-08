@@ -470,83 +470,93 @@
   .presets-grid { grid-template-columns: 1fr; }
 }
 
-/* ============ WALKTHROUGH ============ */
-.walk-overlay {
-  position: fixed; inset: 0;
-  background: rgba(27, 24, 38, 0.92);
-  z-index: 100;
-  display: grid;
-  place-items: center;
-  animation: nem-fade-in 0.25s ease-out;
-  padding: 16px;
-}
-@keyframes nem-fade-in { from { opacity: 0; } to { opacity: 1; } }
-.walk-card {
-  width: min(540px, 100%);
-  border: 1px solid var(--c-border);
-  background: var(--c-card);
-  padding: 28px;
-  position: relative;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+/* ============ GUIDED TOUR ============ */
+.tour { position: fixed; inset: 0; z-index: 100; }
+/* Room for the sticky topbar (two rows on phones) when the tour scrolls a step into view */
+[data-tour] { scroll-margin-top: 76px; }
+@media (max-width: 600px) { [data-tour] { scroll-margin-top: 120px; } }
+/* Catches clicks on the page during the tour; dims it when a step has nothing to highlight */
+.tour-blocker { position: absolute; inset: 0; }
+.tour-blocker.dim { background: rgba(8, 7, 18, 0.74); }
+/* Dim layer with a hole per highlighted element, and a violet ring around each hole */
+.tour-mask { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.tour-mask > rect { fill: rgba(8, 7, 18, 0.74); }
+.tour-spotlight {
+  position: fixed;
   border-radius: 12px;
+  outline: 2px solid rgba(196, 181, 253, 0.75);
+  pointer-events: none;
+  animation: tour-ring-in 0.2s ease-out;
 }
-.walk-card::before,
-.walk-card::after {
-  content: ''; position: absolute;
-  width: 14px; height: 14px;
+@keyframes tour-ring-in { from { opacity: 0; } to { opacity: 1; } }
+.tour-popover {
+  position: fixed;
+  width: min(360px, calc(100vw - 32px));
+  padding: 18px 18px 14px;
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  background: #17162A;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 18px 40px -12px rgba(0, 0, 0, 0.7);
+  transition: top 0.25s ease, left 0.25s ease;
 }
-.walk-card::before {
-  top: -1px; left: -1px;
-  border-top: 2px solid var(--c-accent);
-  border-left: 2px solid var(--c-accent);
-}
-.walk-card::after {
-  bottom: -1px; right: -1px;
-  border-bottom: 2px solid var(--c-accent);
-  border-right: 2px solid var(--c-accent);
-}
-.walk-step {
+.tour-count {
   font-family: var(--font-mono);
   font-size: 10px;
-  letter-spacing: 0.18em;
-  color: var(--c-accent);
+  letter-spacing: 0.16em;
   text-transform: uppercase;
-  margin-bottom: 8px;
+  color: var(--c-accent-bright);
+  margin-bottom: 6px;
 }
-.walk-title {
-  font-size: 22px;
+.tour-title {
+  font-size: 17px;
   font-weight: 600;
-  margin: 0 0 10px 0;
-  letter-spacing: -0.02em;
+  margin: 0 0 6px;
   color: var(--c-text);
+  text-wrap: balance;
 }
-.walk-desc {
-  color: var(--c-text-dim);
+.tour-body {
   font-size: 13.5px;
-  line-height: 1.6;
-  margin-bottom: 22px;
+  line-height: 1.55;
+  color: var(--c-text-dim);
+  margin-bottom: 14px;
 }
-.walk-desc code {
-  font-family: var(--font-mono);
+.tour-nav { display: flex; align-items: center; gap: 10px; }
+.tour-skip {
+  background: none;
+  border: 0;
+  padding: 4px 0;
   font-size: 12px;
-  color: var(--c-accent-glow);
-  background: var(--c-bg);
-  padding: 1px 6px;
-  border: 1px solid var(--c-border);
-  border-radius: 4px;
+  color: var(--c-text-mute);
+  cursor: pointer;
 }
-.walk-nav {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+.tour-skip:hover { color: var(--c-text-dim); }
+.tour-dots { display: flex; gap: 5px; margin: 0 auto; }
+.tour-dots span { width: 6px; height: 6px; border-radius: 50%; background: var(--c-border); }
+.tour-dots span.on { background: var(--c-accent-glow); }
+.tour-actions { display: flex; gap: 8px; }
+.tour-btn {
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--c-surface-line);
+  background: var(--c-surface);
+  color: var(--c-text);
+  cursor: pointer;
 }
-.walk-dots { display: flex; gap: 6px; }
-.walk-dot {
-  width: 20px; height: 2px;
-  background: var(--c-border);
+.tour-btn:hover { border-color: rgba(139, 92, 246, 0.45); }
+.tour-btn.primary {
+  background: var(--c-accent);
+  border-color: transparent;
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.2);
 }
-.walk-dot.on { background: var(--c-accent); }
+.tour-btn.primary:hover { filter: brightness(1.1); }
+.tour-skip:focus-visible, .tour-btn:focus-visible { outline: 2px solid var(--c-accent-glow); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .tour-spotlight { animation: none; }
+  .tour-popover { transition: none; }
+}
 
 /* ============ EVENTS ============ */
 .kind-info-bar {

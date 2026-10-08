@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { NostrFilter } from '@nostrify/nostrify';
 import { TestApp } from '@/test/TestApp';
-import { WALK_STORAGE_KEY } from '@/components/Walkthrough';
+import { TOUR_STORAGE_KEY } from '@/components/GuidedTour';
 import { EventMonitor } from './EventMonitor';
 
 // Each test uses its own relay: a search scheduled by a previous test can land after it ends
@@ -38,7 +38,7 @@ function renderAt(path: string) {
 describe('EventMonitor shared search', () => {
   beforeEach(() => {
     queries.length = 0;
-    localStorage.removeItem(WALK_STORAGE_KEY);
+    localStorage.removeItem(TOUR_STORAGE_KEY);
   });
 
   it('fills the form from the URL and runs the search', async () => {
@@ -59,13 +59,13 @@ describe('EventMonitor shared search', () => {
   it('does not show the walkthrough to someone opening a shared search', () => {
     renderAt('/?relays=nos.lol&kinds=1');
 
-    expect(screen.queryByText('Point it at a relay')).not.toBeInTheDocument();
+    expect(screen.queryByText('Start with a relay')).not.toBeInTheDocument();
   });
 
   it('still shows the walkthrough on a first visit without a shared search', () => {
     renderAt('/');
 
-    expect(screen.getByText('Point it at a relay')).toBeInTheDocument();
+    expect(screen.getByText('Start with a relay')).toBeInTheDocument();
   });
 
   it('fills a shared stream but waits for the visitor to start it', async () => {
@@ -86,7 +86,7 @@ describe('EventMonitor shared search', () => {
   });
 
   it('keeps the address bar on the last search', async () => {
-    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/');
 
     fireEvent.change(screen.getByPlaceholderText('relay.damus.io or wss://relay.damus.io'), { target: { value: 'nos.lol' } });
@@ -109,7 +109,7 @@ describe('EventMonitor shared search', () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     Object.defineProperty(window, 'isSecureContext', { value: true, configurable: true });
-    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/');
 
     fireEvent.change(screen.getByPlaceholderText('relay.damus.io or wss://relay.damus.io'), { target: { value: 'relay.mostro.network' } });
@@ -121,14 +121,14 @@ describe('EventMonitor shared search', () => {
   });
 
   it('describes a kind without a NIP by its description only', () => {
-    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/?relays=kindinfo.example.com&kinds=25050&mode=stream');
 
     expect(screen.getByRole('link', { name: 'Call Offer' })).toBeInTheDocument();
   });
 
   it('marks the kind of an unrecommended NIP', () => {
-    localStorage.setItem(WALK_STORAGE_KEY, '1');
+    localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/?relays=unrec.example.com&kinds=4&mode=stream');
 
     expect(screen.getByText('unrecommended')).toHaveAttribute('title', 'NIP-04 is unrecommended: deprecated in favor of NIP-17');
@@ -138,5 +138,23 @@ describe('EventMonitor shared search', () => {
     renderAt('/?relays=nipwarn.example.com&nips=4');
 
     expect(await screen.findByText('NIP-04 is unrecommended: deprecated in favor of NIP-17.')).toBeInTheDocument();
+  });
+
+  it('opens the full tour from How it works, showing the quickstart even with a relay set', async () => {
+    renderAt('/?relays=tour.example.com&kinds=1&mode=stream');
+    expect(screen.queryByText('Start with a relay')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /How it works/ }));
+    expect(screen.getByText('Start with a relay')).toBeInTheDocument();
+    expect(screen.queryByText('// popular relays')).not.toBeInTheDocument();
+
+    for (let i = 0; i < 5; i++) fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(screen.getByText('Not sure what to look for?')).toBeInTheDocument();
+    expect(await screen.findByText('// popular relays')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start exploring' }));
+    expect(screen.queryByText('Not sure what to look for?')).not.toBeInTheDocument();
+    expect(screen.queryByText('// popular relays')).not.toBeInTheDocument();
+    expect(localStorage.getItem(TOUR_STORAGE_KEY)).toBe('1');
   });
 });

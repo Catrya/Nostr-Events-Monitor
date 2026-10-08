@@ -19,6 +19,11 @@ export default {
 			}
 		},
 		extend: {
+			// Type scale: 11 (helper) · 12 (labels, fields, buttons) · 13 (body) · 15 (small titles) · 20 (titles)
+			fontSize: {
+				'2xs': ['11px', { lineHeight: '15px' }],
+				sm: ['13px', { lineHeight: '19px' }],
+			},
 			fontFamily: {
 				sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
 				mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],

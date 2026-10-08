@@ -327,7 +327,7 @@
   color: var(--c-text-mute);
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  font-size: 10px;
+  font-size: 11px;
 }
 
 /* ============ EMPTY STATE ============ */
@@ -358,7 +358,7 @@
 .empty-glyph::before { width: 1px; height: 22px; }
 .empty-glyph::after { width: 22px; height: 1px; }
 .empty-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   margin: 0 0 8px 0;
   letter-spacing: -0.01em;
@@ -387,7 +387,7 @@
 }
 .quickstart-label {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.15em;
   color: var(--c-text-mute);
   text-transform: uppercase;
@@ -463,7 +463,7 @@
 }
 .preset-desc {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--c-text-mute);
 }
 @media (max-width: 600px) {
@@ -501,21 +501,21 @@
 }
 .tour-count {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--c-accent-bright);
   margin-bottom: 6px;
 }
 .tour-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 600;
   margin: 0 0 6px;
   color: var(--c-text);
   text-wrap: balance;
 }
 .tour-body {
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.55;
   color: var(--c-text-dim);
   margin-bottom: 14px;
@@ -535,7 +535,7 @@
 .tour-dots span.on { background: var(--c-accent-glow); }
 .tour-actions { display: flex; gap: 8px; }
 .tour-btn {
-  font-size: 12.5px;
+  font-size: 12px;
   font-weight: 500;
   padding: 6px 12px;
   border-radius: 8px;
@@ -584,7 +584,7 @@
   border-radius: 6px;
   line-height: 1.45;
   font-family: var(--font-mono);
-  font-size: 12.5px;
+  font-size: 13px;
   color: #D9D6E8;
 }
 .json-viewer .token.property { color: #C4B5FD; }

@@ -89,7 +89,7 @@ describe('EventMonitor shared search', () => {
     localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/');
 
-    fireEvent.change(screen.getByPlaceholderText('relay.damus.io or wss://relay.damus.io'), { target: { value: 'nos.lol' } });
+    fireEvent.change(screen.getByPlaceholderText('relay.damus.io'), { target: { value: 'nos.lol' } });
     fireEvent.change(screen.getByPlaceholderText('leave empty for all kinds'), { target: { value: '7' } });
     fireEvent.click(submitButton('Search'));
 
@@ -112,7 +112,7 @@ describe('EventMonitor shared search', () => {
     localStorage.setItem(TOUR_STORAGE_KEY, '1');
     renderAt('/');
 
-    fireEvent.change(screen.getByPlaceholderText('relay.damus.io or wss://relay.damus.io'), { target: { value: 'relay.mostro.network' } });
+    fireEvent.change(screen.getByPlaceholderText('relay.damus.io'), { target: { value: 'relay.mostro.network' } });
     fireEvent.change(screen.getByPlaceholderText('leave empty for all kinds'), { target: { value: '38383' } });
     fireEvent.click(screen.getByRole('button', { name: 'Share search' }));
 

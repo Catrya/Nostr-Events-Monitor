@@ -96,7 +96,7 @@ const TOUR_STEPS: TourStep[] = [
   {
     id: 'quickstart',
     title: 'Not sure what to look for?',
-    body: 'Start with any of these: add a popular relay, then pick a preset to see real events right away.',
+    body: 'Start with any of these: add a popular relay, then pick a preset to see real events right away. Or try Random query, which picks the relays and filters for you.',
   },
 ];
 
@@ -672,10 +672,27 @@ export function EventMonitor() {
 
   // Random query: fills the form with a kind (and maybe a topic) known to return events, then searches
   const lastRandomKindRef = useRef<string | undefined>(undefined);
+  // The relays the last random query set, and the visitor's own relays it started from
+  const lastRandomRelaysRef = useRef<{ relays: string[]; visitorRelays: string[] } | null>(null);
   const randomSearchPendingRef = useRef(false);
   const applyRandomQuery = useCallback(() => {
     const q = pickRandomQuery(lastRandomKindRef.current);
     lastRandomKindRef.current = q.kind;
+
+    // Relays left as the last random query set them are swapped for new ones; the visitor's own are kept,
+    // with ours added only when there are none, or when the kind lives on one relay
+    const current = filters.relays.filter(r => isValidWebSocketUrl(r)).map(r => normalizeRelayUrl(r));
+    const last = lastRandomRelaysRef.current;
+    const visitorRelays = last && current.join() === last.relays.join() ? last.visitorRelays : current;
+    const wanted = q.relays.map(r => `wss://${r}`);
+    let relays = visitorRelays;
+    if (visitorRelays.length === 0) {
+      relays = wanted;
+    } else if (wanted.length === 1 && !visitorRelays.includes(wanted[0])) {
+      relays = [...visitorRelays, wanted[0]];
+    }
+    lastRandomRelaysRef.current = { relays, visitorRelays };
+
     setIsStreaming(false);
     setMode('search');
     setQueryType('kind');
@@ -684,20 +701,12 @@ export function EventMonitor() {
     setNipKinds([]);
     setNipMessage(null);
     setKindsExpanded(false);
-    setFilters(prev => {
-      // Keep the visitor's relays; add ours when there are none, or when the kind lives on one relay
-      const current = prev.relays.filter(r => isValidWebSocketUrl(r));
-      const wanted = q.relays.map(r => `wss://${r}`);
-      let relays = prev.relays;
-      if (current.length === 0) {
-        relays = wanted;
-      } else if (wanted.length === 1 && !current.some(r => normalizeRelayUrl(r) === wanted[0])) {
-        relays = [...current, wanted[0]];
-      }
-      return { relays, kinds: [q.kind], limit: '20', authors: [''], since: '', until: '', tags: [q.tag] };
+    setFilters({
+      relays: relays === current ? filters.relays : relays,
+      kinds: [q.kind], limit: '20', authors: [''], since: '', until: '', tags: [q.tag],
     });
     randomSearchPendingRef.current = true;
-  }, []);
+  }, [filters.relays]);
 
   // Runs once the random query is in the form, so the search and the shared URL use it
   useEffect(() => {
@@ -843,9 +852,16 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div key={queryType} className="ml-auto text-2xs font-mono text-muted-foreground">
-                  {queryType === 'nip' ? 'resolves NIPs → kinds' : 'direct event kind numbers'}
-                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={applyRandomQuery}
+                  disabled={isLoading}
+                  className="ml-auto h-8 px-4 text-xs gap-1.5 bg-accent/10 border-accent/30 hover:bg-accent/20"
+                >
+                  <Dices className="h-3.5 w-3.5" />
+                  Random query
+                </Button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -1293,19 +1309,6 @@ export function EventMonitor() {
                     Clear Filters
                   </Button>
                   <span className="text-2xs text-muted-foreground">&nbsp;</span>
-                </div>
-                <div className="flex flex-col items-center gap-0.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={applyRandomQuery}
-                    disabled={isLoading}
-                    className="h-8 px-4 text-xs gap-1.5 bg-accent/10 border-accent/30 hover:bg-accent/20"
-                  >
-                    <Dices className="h-3.5 w-3.5" />
-                    Random
-                  </Button>
-                  <span className="text-2xs text-muted-foreground">Explore</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5" data-tour="share-search">
                   <Button

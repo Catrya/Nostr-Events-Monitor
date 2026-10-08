@@ -91,7 +91,7 @@ function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="empty-state panel-corner">
+    <div className="empty-state">
       <h3 className="empty-title">{title}</h3>
       <div className="empty-desc space-y-2">{children}</div>
     </div>
@@ -224,7 +224,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
             </Link>
           </div>
         )}
-        <Card className="panel-corner border-accent/20 bg-card/50 divide-y divide-accent/10">
+        <Card className="border-accent/20 bg-card/50 divide-y divide-accent/10">
           <Section
             key={`${event.id}-${event.sig}`}
             icon={allPassed

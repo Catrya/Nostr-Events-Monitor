@@ -215,30 +215,6 @@
   50% { opacity: 0.45; }
 }
 
-/* ============ PANEL DECORATIONS (subtle corner brackets) ============ */
-.panel-corner {
-  position: relative;
-}
-.panel-corner::before,
-.panel-corner::after {
-  content: '';
-  position: absolute;
-  width: 10px;
-  height: 10px;
-  pointer-events: none;
-  opacity: 0.7;
-}
-.panel-corner::before {
-  top: -1px; left: -1px;
-  border-top: 1px solid var(--c-accent);
-  border-left: 1px solid var(--c-accent);
-}
-.panel-corner::after {
-  bottom: -1px; right: -1px;
-  border-bottom: 1px solid var(--c-accent);
-  border-right: 1px solid var(--c-accent);
-}
-
 /* ============ SEGMENTED CONTROLS ============ */
 .seg {
   display: inline-flex;

@@ -747,7 +747,7 @@ export function EventMonitor() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 space-y-4">
-        <Card className="panel-corner border-accent/20 bg-card/50">
+        <Card className="border-accent/20 bg-card/50">
           <CardContent className="p-4 pt-4">
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Mode + Query-by segmented controls */}
@@ -1400,11 +1400,11 @@ export function EventMonitor() {
           )}
 
           {quickstartShownByTour && (
-            <div className="empty-state panel-corner">{quickstart}</div>
+            <div className="empty-state">{quickstart}</div>
           )}
 
           {showEmptyState && validRelays.length === 0 && (
-            <div className="empty-state panel-corner">
+            <div className="empty-state">
               <div className="empty-glyph" />
               <h3 className="empty-title">Enter a relay URL to start monitoring</h3>
               <p className="empty-desc">

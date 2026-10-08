@@ -437,6 +437,7 @@
   transition: all 0.2s;
   font-size: 14px;
 }
+.preset-random { grid-column: 1 / -1; }
 .preset-desc {
   font-family: var(--font-mono);
   font-size: 11px;

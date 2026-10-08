@@ -747,13 +747,13 @@ export function EventMonitor() {
       </div>
 
       <div className="max-w-6xl mx-auto p-4 space-y-4">
-        <Card className="panel-corner border-accent/20 bg-card/50">
+        <Card className="border-accent/20 bg-card/50">
           <CardContent className="p-4 pt-4">
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Mode + Query-by segmented controls */}
               <div className="flex flex-wrap items-center gap-4 pb-1">
                 <div className="flex items-center gap-2" data-tour="mode">
-                  <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">Mode</span>
+                  <span className="text-xs font-medium">Mode</span>
                   <div className="seg" role="tablist" aria-label="Query mode">
                     <button
                       type="button"
@@ -775,7 +775,7 @@ export function EventMonitor() {
                 </div>
 
                 <div className="flex items-center gap-2" data-tour="query-type">
-                  <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">Query by</span>
+                  <span className="text-xs font-medium">Query by</span>
                   <div className="seg" role="tablist" aria-label="Query type">
                     <button
                       type="button"
@@ -796,7 +796,7 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div key={queryType} className="ml-auto text-[11px] font-mono text-muted-foreground">
+                <div key={queryType} className="ml-auto text-2xs font-mono text-muted-foreground">
                   {queryType === 'nip' ? 'resolves NIPs → kinds' : 'direct event kind numbers'}
                 </div>
               </div>
@@ -809,7 +809,7 @@ export function EventMonitor() {
                     showOnLabelClick={true}
                   >
                     <Label className="text-xs font-medium">
-                      Relay <span className="text-accent/70 text-[10px]">(required)</span>
+                      Relay <span className="text-accent/70 text-2xs">(required)</span>
                     </Label>
                   </ClickTooltip>
                   <div className="space-y-1">
@@ -817,14 +817,14 @@ export function EventMonitor() {
                       <div key={index} className="flex gap-1">
                         <Input
                           type="text"
-                          placeholder="relay.damus.io or wss://relay.damus.io"
+                          placeholder="relay.damus.io"
                           value={relay}
                           onChange={(e) => {
                             const newRelays = [...filters.relays];
                             newRelays[index] = e.target.value;
                             setFilters(prev => ({ ...prev, relays: newRelays }));
                           }}
-                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${relay ? 'border-accent/50 bg-accent/5' : ''}`}
+                          className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${relay ? 'border-accent/50 bg-accent/5' : ''}`}
                         />
                         {index === 0 ? (
                           <Button
@@ -890,7 +890,7 @@ export function EventMonitor() {
                                 e.preventDefault();
                               }
                             }}
-                            className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${kind ? 'border-accent/50 bg-accent/5' : ''}`}
+                            className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${kind ? 'border-accent/50 bg-accent/5' : ''}`}
                           />
                           {index === 0 ? (
                             <Button
@@ -969,7 +969,7 @@ export function EventMonitor() {
                                 if (nipMessage) setNipMessage(null);
                               }
                             }}
-                            className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${nip ? 'border-accent/50 bg-accent/5' : ''}`}
+                            className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${nip ? 'border-accent/50 bg-accent/5' : ''}`}
                           />
                           {index === 0 ? (
                             <Button
@@ -998,7 +998,7 @@ export function EventMonitor() {
                         </div>
                       ))}
                       {nipMessage && (
-                        <span className="text-[10px] text-muted-foreground block">{nipMessage}</span>
+                        <span className="text-2xs text-muted-foreground block">{nipMessage}</span>
                       )}
                     </div>
                   </div>
@@ -1024,7 +1024,7 @@ export function EventMonitor() {
                             newAuthors[index] = e.target.value;
                             setFilters(prev => ({ ...prev, authors: newAuthors }));
                           }}
-                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${author ? 'border-accent/50 bg-accent/5' : ''}`}
+                          className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${author ? 'border-accent/50 bg-accent/5' : ''}`}
                         />
                         {index === 0 ? (
                           <Button
@@ -1078,7 +1078,7 @@ export function EventMonitor() {
                     onKeyDown={(e) => {
                       if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault();
                     }}
-                    className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.limit ? 'border-accent/50 bg-accent/5' : ''}`}
+                    className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 ${filters.limit ? 'border-accent/50 bg-accent/5' : ''}`}
                   />
                 </div>
               </div>
@@ -1104,7 +1104,7 @@ export function EventMonitor() {
                             newTags[index] = e.target.value;
                             setFilters(prev => ({ ...prev, tags: newTags }));
                           }}
-                          className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${tag ? 'border-accent/50 bg-accent/5' : ''}`}
+                          className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${tag ? 'border-accent/50 bg-accent/5' : ''}`}
                         />
                         {index === 0 ? (
                           <Button
@@ -1149,7 +1149,7 @@ export function EventMonitor() {
                       placeholder="timestamp"
                       value={filters.since}
                       onChange={(e) => setFilters(prev => ({ ...prev, since: e.target.value }))}
-                      className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${filters.since ? 'border-accent/50 bg-accent/5' : ''}`}
+                      className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${filters.since ? 'border-accent/50 bg-accent/5' : ''}`}
                     />
                     <Button
                       type="button"
@@ -1180,7 +1180,7 @@ export function EventMonitor() {
                       placeholder="timestamp"
                       value={filters.until}
                       onChange={(e) => setFilters(prev => ({ ...prev, until: e.target.value }))}
-                      className={`h-8 text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${filters.until ? 'border-accent/50 bg-accent/5' : ''}`}
+                      className={`h-8 font-mono text-xs md:text-xs bg-background/50 border-accent/30 focus:border-accent/50 flex-1 ${filters.until ? 'border-accent/50 bg-accent/5' : ''}`}
                     />
                     <Button
                       type="button"
@@ -1208,7 +1208,7 @@ export function EventMonitor() {
                     >
                       Search
                     </Button>
-                    <span key={String(noRelayHint)} className="text-[10px] text-muted-foreground">
+                    <span key={String(noRelayHint)} className="text-2xs text-muted-foreground">
                       {noRelayHint === 'search' ? 'Enter a relay first' : 'Fetch once'}
                     </span>
                   </div>
@@ -1231,7 +1231,7 @@ export function EventMonitor() {
                         Stream
                       </Button>
                     )}
-                    <span key={`${noRelayHint}-${isStreaming}`} className="text-[10px] text-muted-foreground">
+                    <span key={`${noRelayHint}-${isStreaming}`} className="text-2xs text-muted-foreground">
                       {noRelayHint === 'stream' ? 'Enter a relay first' : isStreaming ? 'Stop streaming' : 'Real-time'}
                     </span>
                   </div>
@@ -1245,7 +1245,7 @@ export function EventMonitor() {
                   >
                     Clear Filters
                   </Button>
-                  <span className="text-[10px] text-muted-foreground">&nbsp;</span>
+                  <span className="text-2xs text-muted-foreground">&nbsp;</span>
                 </div>
                 <div className="flex flex-col items-center gap-0.5" data-tour="share-search">
                   <Button
@@ -1257,12 +1257,12 @@ export function EventMonitor() {
                     <Link2 className="h-3.5 w-3.5" />
                     Share search
                   </Button>
-                  <span key={String(isSearchCopied)} className={`text-[10px] ${isSearchCopied ? 'text-ok' : 'text-muted-foreground'}`}>
+                  <span key={String(isSearchCopied)} className={`text-2xs ${isSearchCopied ? 'text-ok' : 'text-muted-foreground'}`}>
                     {isSearchCopied ? 'Link copied' : 'Copy link'}
                   </span>
                 </div>
 
-                <div className="ml-auto flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">
+                <div className="ml-auto flex items-center gap-3 pt-1 text-2xs font-mono text-muted-foreground">
                   <span><span translate="no" style={{ color: 'var(--c-accent)' }}>{activeFilters}</span> <span key={activeFilters !== 1 ? 'plural' : 'singular'}>{`filter${activeFilters !== 1 ? 's' : ''} active`}</span></span>
                   <span>·</span>
                   <span>mode: <span translate="no" style={{ color: 'var(--c-accent-glow)' }}>{`${mode}/${queryType}`}</span></span>
@@ -1310,7 +1310,7 @@ export function EventMonitor() {
               <button
                 type="button"
                 onClick={() => setIsStreaming(false)}
-                className="ml-auto h-7 px-3 text-[10px] tracking-widest border border-destructive/40 text-destructive/80 hover:text-destructive hover:border-destructive rounded bg-transparent"
+                className="ml-auto h-7 px-3 text-2xs tracking-widest border border-destructive/40 text-destructive/80 hover:text-destructive hover:border-destructive rounded bg-transparent"
               >
                 ■ STOP
               </button>
@@ -1320,7 +1320,7 @@ export function EventMonitor() {
           {displayEvents.length > 0 && relayStats.size > 0 && (
             <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
               {Array.from(relayStats.entries()).map(([relay, count]) => (
-                <Badge key={relay} variant="outline" className="font-mono text-[11px] font-normal rounded-lg border-accent/25 bg-card/60 text-muted-foreground" translate="no">
+                <Badge key={relay} variant="outline" className="font-mono text-2xs font-normal rounded-lg border-accent/25 bg-card/60 text-muted-foreground" translate="no">
                   {`${relay.replace('wss://', '').replace('ws://', '')}: ${count} event${count !== 1 ? 's' : ''}`}
                 </Badge>
               ))}
@@ -1400,11 +1400,11 @@ export function EventMonitor() {
           )}
 
           {quickstartShownByTour && (
-            <div className="empty-state panel-corner">{quickstart}</div>
+            <div className="empty-state">{quickstart}</div>
           )}
 
           {showEmptyState && validRelays.length === 0 && (
-            <div className="empty-state panel-corner">
+            <div className="empty-state">
               <div className="empty-glyph" />
               <h3 className="empty-title">Enter a relay URL to start monitoring</h3>
               <p className="empty-desc">
@@ -1453,7 +1453,7 @@ export function EventMonitor() {
                         key={url}
                         translate="no"
                         variant="secondary"
-                        className="font-mono text-[11px] font-medium rounded-lg bg-accent/15 border-accent/30 text-[var(--c-accent-glow)]"
+                        className="font-mono text-2xs font-medium rounded-lg bg-accent/15 border-accent/30 text-[var(--c-accent-glow)]"
                       >
                         {url.replace('wss://', '').replace('ws://', '')}
                       </Badge>

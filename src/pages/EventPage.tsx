@@ -48,7 +48,7 @@ function RelayList({ relays }: { relays: RelayResult[] }) {
         <li key={url} className="flex items-center gap-2">
           <span className="shrink-0">{RELAY_STATUS[status].icon}</span>
           <span translate="no" className="font-mono text-xs min-w-0 truncate">{url}</span>
-          {fromLink && <Badge variant="outline" className="text-[10px] shrink-0 whitespace-nowrap">from link</Badge>}
+          {fromLink && <Badge variant="outline" className="text-2xs shrink-0 whitespace-nowrap">from link</Badge>}
           <span key={status} className="ml-auto shrink-0 whitespace-nowrap text-xs text-muted-foreground">{RELAY_STATUS[status].label}</span>
         </li>
       ))}
@@ -91,7 +91,7 @@ function relaysSummary(relays: RelayResult[], isSearching: boolean): string {
 
 function Message({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="empty-state panel-corner">
+    <div className="empty-state">
       <h3 className="empty-title">{title}</h3>
       <div className="empty-desc space-y-2">{children}</div>
     </div>
@@ -224,7 +224,7 @@ export function EventPage({ mode = 'id' }: { mode?: 'id' | 'address' }) {
             </Link>
           </div>
         )}
-        <Card className="panel-corner border-accent/20 bg-card/50 divide-y divide-accent/10">
+        <Card className="border-accent/20 bg-card/50 divide-y divide-accent/10">
           <Section
             key={`${event.id}-${event.sig}`}
             icon={allPassed

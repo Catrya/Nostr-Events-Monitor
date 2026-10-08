@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { ClickTooltip } from '@/components/ClickTooltip';
 import { JsonViewer } from '@/components/JsonViewer';
 import { CopyEventButton, ShareEventButton } from '@/components/EventCardActions';
-import { Walkthrough, WALK_STORAGE_KEY } from '@/components/Walkthrough';
+import { GuidedTour, TOUR_STORAGE_KEY, type TourStep } from '@/components/GuidedTour';
 import { Plus, X, ChevronDown, ChevronUp, Link2 } from 'lucide-react';
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard';
 import { getKindInfo, getKindsForNip, getNipInfo } from '@/data/kindInfo';
@@ -67,6 +67,39 @@ function decodeAuthor(author: string): string {
   return author;
 }
 
+const TOUR_STEPS: TourStep[] = [
+  {
+    id: 'relay',
+    title: 'Start with a relay',
+    body: 'To find events, first add the relay, or relays, where you want to look. Type an address like relay.damus.io, and use + to add more and search them all at once.',
+  },
+  {
+    id: 'query-type',
+    title: 'Choose how to search',
+    body: 'Use Kind if you know the event kind number: 1 is a short note, 38383 a Mostro order. Use NIP to search every kind a NIP defines.',
+  },
+  {
+    id: 'filters',
+    title: 'Narrow it down',
+    body: 'Optionally filter by author (npub or hex), by tags written as name:value (like t:bitcoin), by a time range, or set how many events to bring.',
+  },
+  {
+    id: 'mode',
+    title: 'Search once or stream live',
+    body: 'Search fetches the matching events once. Stream keeps listening and shows new events in real time as they reach the relays.',
+  },
+  {
+    id: 'share-search',
+    title: 'Share your search',
+    body: 'Share search copies a link with these filters, so anyone can open the same search. The address bar also updates every time you search.',
+  },
+  {
+    id: 'quickstart',
+    title: 'Not sure what to look for?',
+    body: 'Start with any of these: add a popular relay, then pick a preset to see real events right away.',
+  },
+];
+
 export function EventMonitor() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -93,7 +126,8 @@ export function EventMonitor() {
   const [nipKinds, setNipKinds] = useState<number[]>([]);
   const [nipMessage, setNipMessage] = useState<string | null>(null);
   const [kindsExpanded, setKindsExpanded] = useState(false);
-  const [walkOpen, setWalkOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourStep, setTourStep] = useState<string | null>(null);
   const [eventRate, setEventRate] = useState(0);
   const nipActiveRef = useRef(false);
   const relayRef = useRef<NRelay1[]>([]);
@@ -101,18 +135,21 @@ export function EventMonitor() {
   const previousRelaysRef = useRef<string[]>(filters.relays);
   const rateWindowRef = useRef<number[]>([]);
 
-  // Walkthrough on first visit, unless it came from a shared search: the results matter more
+  // Guided tour on first visit, unless it came from a shared search: the results matter more
   useEffect(() => {
     if (typeof window === 'undefined' || sharedSearch) return;
-    if (!localStorage.getItem(WALK_STORAGE_KEY)) {
-      setWalkOpen(true);
+    try {
+      if (!localStorage.getItem(TOUR_STORAGE_KEY)) setTourOpen(true);
+    } catch {
+      // storage unavailable: skip the automatic tour
     }
   }, [sharedSearch]);
 
-  const closeWalkthrough = useCallback(() => {
-    setWalkOpen(false);
+  const closeTour = useCallback(() => {
+    setTourOpen(false);
+    setTourStep(null);
     try {
-      localStorage.setItem(WALK_STORAGE_KEY, '1');
+      localStorage.setItem(TOUR_STORAGE_KEY, '1');
     } catch {
       // ignore storage errors (private mode, etc.)
     }
@@ -633,8 +670,44 @@ export function EventMonitor() {
     setKindsExpanded(false);
   }, []);
 
+  // Popular relays and presets: in the empty state, and shown on demand by the guided tour
+  const quickstart = (
+    <div className="quickstart" data-tour="quickstart">
+      <div className="quickstart-label">// popular relays</div>
+      <div className="relay-suggestions">
+        {SUGGESTED_RELAYS.map((r) => (
+          <button
+            key={r}
+            type="button"
+            className="relay-suggest"
+            onClick={() => addSuggestedRelay(r)}
+          >
+            <span className="plus">+</span> {r}
+          </button>
+        ))}
+      </div>
+      <div className="quickstart-label">// query presets</div>
+      <div className="presets-grid">
+        {PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className="preset-card"
+            onClick={() => applyPreset(p)}
+          >
+            <div className="preset-title">
+              {p.title} <span className="preset-arrow">→</span>
+            </div>
+            <div className="preset-desc">{p.desc}</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
   const showEmptyState =
     displayEvents.length === 0 && !isLoading && !isStreaming && !error;
+  // The tour's last step always points at the quickstart, even with a relay set or results shown
+  const quickstartShownByTour = tourStep === 'quickstart' && !(showEmptyState && validRelays.length === 0);
 
   const streamingLabelSuffix = isStreaming
     ? `(${displayEvents.length}${displayEvents.length >= (filters.limit ? parseInt(filters.limit, 10) : MAX_STREAM_EVENTS) ? ' -- cap reached' : ''})`
@@ -642,7 +715,7 @@ export function EventMonitor() {
 
   return (
     <div className="min-h-screen text-foreground">
-      {walkOpen && <Walkthrough onClose={closeWalkthrough} />}
+      {tourOpen && <GuidedTour steps={TOUR_STEPS} onClose={closeTour} onStepChange={setTourStep} />}
 
       {/* TOPBAR */}
       <div className="topbar">
@@ -665,7 +738,7 @@ export function EventMonitor() {
             <button
               type="button"
               className="status-pill clickable"
-              onClick={() => setWalkOpen(true)}
+              onClick={() => setTourOpen(true)}
             >
               <span>?</span> How it works
             </button>
@@ -679,7 +752,7 @@ export function EventMonitor() {
             <form onSubmit={handleSubmit} className="space-y-3">
               {/* Mode + Query-by segmented controls */}
               <div className="flex flex-wrap items-center gap-4 pb-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" data-tour="mode">
                   <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">Mode</span>
                   <div className="seg" role="tablist" aria-label="Query mode">
                     <button
@@ -701,7 +774,7 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2" data-tour="query-type">
                   <span className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground font-mono">Query by</span>
                   <div className="seg" role="tablist" aria-label="Query type">
                     <button
@@ -730,7 +803,7 @@ export function EventMonitor() {
 
               <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                 {/* Relays */}
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="relay">
                   <ClickTooltip
                     content="Nostr relay URLs. You can enter 'relay.damus.io' or 'wss://relay.damus.io' - both formats are accepted."
                     showOnLabelClick={true}
@@ -932,7 +1005,7 @@ export function EventMonitor() {
                 )}
 
                 {/* Authors */}
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="filters">
                   <ClickTooltip
                     content="The event's pubkey must match one of these to be included."
                     showOnLabelClick={true}
@@ -983,7 +1056,7 @@ export function EventMonitor() {
                 </div>
 
                 {/* Limit */}
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="filters">
                   <ClickTooltip
                     content="Maximum number of events to display. Default: 50 (Search) / 500 (Stream)."
                     showOnLabelClick={true}
@@ -1011,7 +1084,7 @@ export function EventMonitor() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="filters">
                   <ClickTooltip
                     content="Filter events by specific tags. Format: tagname:value (e.g. id:event-id)"
                     showOnLabelClick={true}
@@ -1062,7 +1135,7 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="filters">
                   <ClickTooltip
                     content="A timestamp. Only show events newer than this time."
                     showOnLabelClick={true}
@@ -1093,7 +1166,7 @@ export function EventMonitor() {
                   </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-1" data-tour="filters">
                   <ClickTooltip
                     content="A timestamp. Only show events older than this time."
                     showOnLabelClick={true}
@@ -1174,7 +1247,7 @@ export function EventMonitor() {
                   </Button>
                   <span className="text-[10px] text-muted-foreground">&nbsp;</span>
                 </div>
-                <div className="flex flex-col items-center gap-0.5">
+                <div className="flex flex-col items-center gap-0.5" data-tour="share-search">
                   <Button
                     type="button"
                     variant="outline"
@@ -1326,6 +1399,10 @@ export function EventMonitor() {
             </Card>
           )}
 
+          {quickstartShownByTour && (
+            <div className="empty-state panel-corner">{quickstart}</div>
+          )}
+
           {showEmptyState && validRelays.length === 0 && (
             <div className="empty-state panel-corner">
               <div className="empty-glyph" />
@@ -1334,37 +1411,7 @@ export function EventMonitor() {
                 Pick a relay below or paste your own <code>wss://</code> endpoint in the Relay field above.
                 Then run a query or start streaming.
               </p>
-              <div className="quickstart">
-                <div className="quickstart-label">// popular relays</div>
-                <div className="relay-suggestions">
-                  {SUGGESTED_RELAYS.map((r) => (
-                    <button
-                      key={r}
-                      type="button"
-                      className="relay-suggest"
-                      onClick={() => addSuggestedRelay(r)}
-                    >
-                      <span className="plus">+</span> {r}
-                    </button>
-                  ))}
-                </div>
-                <div className="quickstart-label">// query presets</div>
-                <div className="presets-grid">
-                  {PRESETS.map((p) => (
-                    <button
-                      key={p.id}
-                      type="button"
-                      className="preset-card"
-                      onClick={() => applyPreset(p)}
-                    >
-                      <div className="preset-title">
-                        {p.title} <span className="preset-arrow">→</span>
-                      </div>
-                      <div className="preset-desc">{p.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {quickstart}
             </div>
           )}
 

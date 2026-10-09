@@ -129,6 +129,7 @@ export function EventMonitor() {
   const [tourOpen, setTourOpen] = useState(false);
   const [tourStep, setTourStep] = useState<string | null>(null);
   const [eventRate, setEventRate] = useState(0);
+  const [searchRequest, setSearchRequest] = useState(0);
   const nipActiveRef = useRef(false);
   const relayRef = useRef<NRelay1[]>([]);
   const previousFiltersRef = useRef<NostrFilter>({});
@@ -548,8 +549,14 @@ export function EventMonitor() {
     }
 
     syncUrl(searchQuery);
-    setTimeout(() => refetch(), 0);
-  }, [validRelays.length, refetch, queryType, resolveNipKinds, syncUrl, searchQuery]);
+    setSearchRequest(n => n + 1);
+  }, [validRelays.length, queryType, resolveNipKinds, syncUrl, searchQuery]);
+
+  // Fetches after the render that applies the NIP kinds. A fetch started before it runs with the
+  // previous query, which is cancelled when the query key changes, so nothing reaches the relays.
+  useEffect(() => {
+    if (searchRequest > 0) refetch();
+  }, [searchRequest, refetch]);
 
   const handleStream = useCallback(() => {
     if (validRelays.length === 0) {
